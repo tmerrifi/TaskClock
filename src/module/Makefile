@@ -1,5 +1,5 @@
 obj-m = task_clock.o
-ksnapmod-y = clock_main.o
+task_clock-y = clock_main.o
 
 KBUILD_CFLAGS += -g -O3
 
