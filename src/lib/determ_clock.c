@@ -28,7 +28,8 @@ void __make_clock_sys_call(void * address, u_int64_t tid, u_int64_t fd){
 void * __create_shared_mem(){
   int fd;
   void * mem;
-  char * file_path = "TASK_CLOCK_XXXXXX";
+  char file_path[200];
+  sprintf(file_path, "TASK_CLOCK_XXXXXX");
   if ((fd = mkstemp(file_path))==-1){
     perror("couldn't open the shared mem file from determ_clock.c");
     exit(1);
