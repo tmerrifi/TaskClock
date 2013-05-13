@@ -8,8 +8,20 @@
 
 MODULE_LICENSE("GPL");
 
+#define get_task_clock() (current->task_clock)
+
+#define task_clock_ticks() (current->task_clock.tick_arr)
+
+#define task_clock_tid() (current->task_clock.tid)
+
 void task_clock_overflow_handler(){
-  printk(KERN_EMERG "Im in the overflow handler\n");
+  printk(KERN_EMERG "Im in the overflow handler, \n");
+  if (!access_ok(VERIFY_WRITE, task_clock_ticks(), sizeof(uint64_t))){
+    printk(KERN_EMERG "in task_clock_overflow_handler: access is not ok\n");
+    return;
+  }
+  //increment our tick count
+  task_clock_ticks()[task_clock_tid]++;
 }
 
 int init_module(void)
