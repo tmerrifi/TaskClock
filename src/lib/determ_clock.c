@@ -21,6 +21,7 @@ struct determ_clock_info * clock_info;
 
 //making a simple system call to let the kernel know where the tick array is located
 void __make_clock_sys_call(void * address, u_int64_t tid, u_int64_t fd){
+  printf("addr is %p\n", address);
   syscall(__TASK_CLOCK_SYS_CALL, fd, (unsigned long)address, tid);
 }
 
@@ -52,7 +53,7 @@ __attribute__((constructor)) static void determ_clock_init(){
   //initialize the first clock now
   determ_task_clock_init(0);
   //now make a system call to open the task_clock in the kernel
-  __make_clock_sys_call(clock_info->clocks, 0, clock_info->clocks[0].perf_counter->fd);
+  __make_clock_sys_call((clock_info->clocks, 0, clock_info->clocks[0].perf_counter->fd);
   printf("INITIALIZED\n");
 }
 
