@@ -4,6 +4,7 @@
 #include <linux/fs.h>
 #include <linux/path.h>
 #include <linux/string.h>
+#include <linux/uaccess.h>
 #include <linux/task_clock.h>
 
 MODULE_LICENSE("GPL");
