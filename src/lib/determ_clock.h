@@ -17,7 +17,7 @@
    };
 
    struct determ_clock_info{
-     struct u_int64_t clocks[DETERM_CLOCK_MAX_THREADS];
+     u_int64_t clocks[DETERM_CLOCK_MAX_THREADS];
    };
 
 
