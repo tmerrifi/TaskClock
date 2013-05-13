@@ -23,7 +23,9 @@ void task_clock_overflow_handler(){
   }
   //increment our tick count
   task_clock_ticks()[task_clock_tid()]++;*/
-  current->task_clock.tick_arr[0].tid++;
+  if (current->task_clock){
+    
+  }
 }
 
 int init_module(void)
