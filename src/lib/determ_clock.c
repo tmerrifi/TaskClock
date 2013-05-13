@@ -45,7 +45,7 @@ __attribute__((constructor)) static void determ_clock_init(){
   //TODO: this needs to be shared memory..
   clock_info = __create_shared_mem();
   printf("huh? %d\n", *(unsigned char *)clock_info);
-
+  exit(1);
   //zero out the memory
   memset(clock_info->clocks, 0, DETERM_CLOCK_MAX_THREADS*sizeof(struct determ_task_clock_info));
   //initialize the first clock now
