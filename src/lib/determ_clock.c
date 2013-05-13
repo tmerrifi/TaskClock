@@ -29,12 +29,15 @@ void * __create_shared_mem(){
   int fd;
   void * mem;
   char file_path[200];
+  u_int64_t segment_size=DETERM_CLOCK_MAX_THREADS * sizeof(struct determ_task_clock_info);
+
   sprintf(file_path, "TASK_CLOCK_XXXXXX");
   if ((fd = mkstemp(file_path))==-1){
     perror("couldn't open the shared mem file from determ_clock.c");
     exit(1);
   }
-  if ((mem = mmap(NULL,DETERM_CLOCK_MAX_THREADS * sizeof(struct determ_task_clock_info),PROT_READ | PROT_WRITE,MAP_SHARED,fd,0))==NULL){
+  ftruncate(fd, segment_size); 
+  if ((mem = mmap(NULL,segment_size,PROT_READ | PROT_WRITE,MAP_SHARED,fd,0))==NULL){
     perror("mmap failed in determ_clock.c");
     exit(1);
   }
