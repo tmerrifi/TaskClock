@@ -77,6 +77,14 @@ void perf_counter_start(struct perf_counter_info * pci){
   }
 }
 
+void perf_counter_stop(struct perf_counter_info * pci){
+  if ( ioctl(pci->fd, PERF_EVENT_IOC_DISABLE, 0) != 0){
+    printf("\ndisable wrong\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+
 struct perf_event_header * __move_one_record(struct perf_event_header * current){
   return (struct perf_event_header *)(((u_int8_t *) current) + current->size);
 }

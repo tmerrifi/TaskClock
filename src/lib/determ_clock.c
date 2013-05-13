@@ -70,9 +70,6 @@ void determ_task_clock_start(u_int32_t tid){
 }
 
 u_int64_t determ_task_clock_read(u_int32_t tid){
-  if ( ioctl(pci->fd, PERF_EVENT_IOC_DISABLE, 0) != 0){
-    printf("\ndisable wrong\n");
-    exit(EXIT_FAILURE);
-  }
+  perf_counter_stop(task_clock_info.perf_counter);
   return clock_info->clocks[tid];
 }
