@@ -25,8 +25,8 @@
    //how many instructions to count before generating a sample
 #define DETERM_CLOCK_SAMPLE_PERIOD 1000
 
-   void determ_clock_init();
-   void determ_task_clock_init(u_int64_t tid);
+   static void determ_clock_init();
+   void determ_task_clock_init(u_int32_t tid);
    void determ_task_clock_start(u_int32_t tid);
    void determ_task_clock_read(u_int32_t tid);
 
