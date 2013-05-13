@@ -36,6 +36,7 @@ int init_module(void)
 void cleanup_module(void)
 {
   printk(KERN_EMERG "cleanup module\n");
+  task_clock_func.task_clock_overflow_handler=NULL;
 }
 
 
