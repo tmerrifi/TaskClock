@@ -34,7 +34,7 @@ void * __create_shared_mem(){
     perror("couldn't open the shared mem file from determ_clock.c");
     exit(1);
   }
-  if ((mem = mmap(NULL,DETERM_CLOCK_MAX_THREADS * sizeof(struct determ_task_clock_info),PROT_READ,MAP_SHARED,fd,0))==NULL){
+  if ((mem = mmap(NULL,DETERM_CLOCK_MAX_THREADS * sizeof(struct determ_task_clock_info),PROT_READ | PROT_WRITE,MAP_SHARED,fd,0))==NULL){
     perror("mmap failed in determ_clock.c");
     exit(1);
   }
