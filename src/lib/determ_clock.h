@@ -12,7 +12,7 @@
 #define DETERM_CLOCK_MAX_THREADS 1024
 
    struct determ_task_clock_info{
-     pid_t tid;
+     u_int32_t tid;
      u_int64_t ticks;
      struct perf_counter_info * perf_counter;
    };
