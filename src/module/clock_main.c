@@ -24,6 +24,7 @@ void task_clock_overflow_handler(){
   }
   //increment our tick count
   task_clock_ticks()[task_clock_tid()]++;
+  printk(KERN_EMERG "ticks: %llu\n",   task_clock_ticks()[task_clock_tid()]);
 }
 
 int init_module(void)
