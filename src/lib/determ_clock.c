@@ -54,7 +54,7 @@ __attribute__((constructor)) static void determ_clock_init(){
 //initialize the clock structure and call the perf object to actually set up the
 //instruction counting
 void determ_task_clock_init(u_int32_t tid){
-  struct determ_task_clock_info * clock = clock_info[tid];
+  struct determ_task_clock_info * clock = clock_info->clocks[tid];
   clock_info->clocks[tid].tid=tid;
   clock_info->clocks[tid].ticks=0;
   clock_info->clocks[tid].perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD);
