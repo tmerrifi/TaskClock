@@ -16,6 +16,7 @@ tests : $(TESTS)
 
 module : 
 	pushd module; \
+	make clean; \
 	make; \
 	./install.sh;
 
