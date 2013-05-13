@@ -1,7 +1,7 @@
 
 SHELL = /bin/bash
 CFLAGS = -g -std=c99 -fPIC
-SOURCES = ./clock/perf_counter.o ./clock/determ_clock.o
+SOURCES = ./lib/perf_counter.o ./lib/determ_clock.o
 TESTS = clock_tests
 LIBS = -lrt
 
@@ -21,7 +21,7 @@ clock_tests :
 	popd;
 
 clean : 
-	rm ./clock/*.o; \
-	pushd clock/tests; \
+	rm ./lib/*.o; \
+	pushd lib/tests; \
 	make clean; \
 	popd;
