@@ -1,4 +1,5 @@
 
+.PHONY : module
 SHELL = /bin/bash
 CFLAGS = -g -std=c99 -fPIC
 SOURCES = ./lib/perf_counter.o ./lib/determ_clock.o
