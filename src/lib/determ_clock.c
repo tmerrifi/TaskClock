@@ -11,6 +11,7 @@
 #include "perf_counter.h"
 
 struct determ_clock_info * clock_info;
+struct determ_task_clock_info task_clock_info;
 
 #if __x86_64__
 /* 64-bit */
@@ -30,7 +31,7 @@ void * __create_shared_mem(){
   int fd;
   void * mem;
   char file_path[200];
-  u_int64_t segment_size=DETERM_CLOCK_MAX_THREADS * sizeof(struct determ_task_clock_info);
+  u_int64_t segment_size=sizeof(struct determ_clock_info);
 
   sprintf(file_path, "TASK_CLOCK_XXXXXX");
   if ((fd = mkstemp(file_path))==-1){
@@ -49,7 +50,7 @@ __attribute__((constructor)) static void determ_clock_init(){
   //TODO: this needs to be shared memory..
   clock_info = __create_shared_mem();
   //zero out the memory
-  memset(clock_info->clocks, 0, DETERM_CLOCK_MAX_THREADS*sizeof(struct determ_task_clock_info));
+  memset(clock_info->clocks, 0, sizeof(struct determ_clock_info));
   //initialize the first clock now
   determ_task_clock_init(0);
   //now make a system call to open the task_clock in the kernel
@@ -60,15 +61,15 @@ __attribute__((constructor)) static void determ_clock_init(){
 //initialize the clock structure and call the perf object to actually set up the
 //instruction counting
 void determ_task_clock_init(u_int32_t tid){
-  clock_info->clocks[tid].tid=tid;
-  clock_info->clocks[tid].ticks=0;
-  clock_info->clocks[tid].perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD);
+  clock_info->clocks[tid];
+  task_clock_info.tid=tid;
+  task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD);
 }
 
 void determ_task_clock_start(u_int32_t tid){
-  perf_counter_start(clock_info->clocks[tid].perf_counter);
+  perf_counter_start(task_clock_info.perf_counter);
 }
 
 u_int64_t determ_task_clock_read(u_int32_t tid){
-  return clock_info->clocks[tid].ticks;
+  return clock_info->clocks[tid];
 }

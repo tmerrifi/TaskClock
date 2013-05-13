@@ -13,12 +13,11 @@
 
    struct determ_task_clock_info{
      u_int32_t tid;
-     u_int64_t ticks;
      struct perf_counter_info * perf_counter;
    };
 
    struct determ_clock_info{
-     struct determ_task_clock_info clocks[DETERM_CLOCK_MAX_THREADS];
+     struct u_int64_t clocks[DETERM_CLOCK_MAX_THREADS];
    };
 
 
