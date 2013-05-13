@@ -23,7 +23,7 @@ void task_clock_overflow_handler(){
   }
   //increment our tick count
   task_clock_ticks()[task_clock_tid()]++;*/
-  if (current->task_clock){
+  if (current){
     
   }
 }
