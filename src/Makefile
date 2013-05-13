@@ -14,6 +14,11 @@ dynlib: $(SOURCES)
 
 tests : $(TESTS)
 
+module : 
+	pushd module; \
+	make; \
+	./install.sh;
+
 clock_tests : 
 	pushd lib/tests; \
 	make; \
