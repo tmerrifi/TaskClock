@@ -28,7 +28,7 @@
    static void determ_clock_init();
    void determ_task_clock_init(u_int32_t tid);
    void determ_task_clock_start(u_int32_t tid);
-   void determ_task_clock_read(u_int32_t tid);
+   u_int64_t determ_task_clock_read(u_int32_t tid);
 
 #endif
 

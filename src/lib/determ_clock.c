@@ -64,6 +64,6 @@ void determ_task_clock_start(u_int32_t tid){
   perf_counter_start(clock_info->clocks[tid].perf_counter);
 }
 
-void determ_task_clock_read(u_int32_t tid){
+u_int64_t determ_task_clock_read(u_int32_t tid){
   return clock_info->clocks[tid].ticks;
 }
