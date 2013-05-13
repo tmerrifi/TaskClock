@@ -15,7 +15,7 @@ dynlib: $(SOURCES)
 tests : $(TESTS)
 
 clock_tests : 
-	pushd clock/tests; \
+	pushd lib/tests; \
 	make; \
 	make tests; \
 	popd;
