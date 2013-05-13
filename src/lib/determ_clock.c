@@ -54,14 +54,13 @@ __attribute__((constructor)) static void determ_clock_init(){
   //initialize the first clock now
   determ_task_clock_init(0);
   //now make a system call to open the task_clock in the kernel
-  __make_clock_sys_call(clock_info->clocks, 0, clock_info->clocks[0].perf_counter->fd);
+  __make_clock_sys_call(clock_info->clocks, 0, task_clock_info.perf_counter->fd);
   printf("INITIALIZED\n");
 }
 
 //initialize the clock structure and call the perf object to actually set up the
 //instruction counting
 void determ_task_clock_init(u_int32_t tid){
-  clock_info->clocks[tid];
   task_clock_info.tid=tid;
   task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD);
 }
