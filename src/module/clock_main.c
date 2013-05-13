@@ -22,7 +22,7 @@ void task_clock_overflow_handler(){
     return;
   }
   //increment our tick count
-  task_clock_ticks()[task_clock_tid]++;
+  task_clock_ticks()[task_clock_tid()]++;
 }
 
 int init_module(void)
