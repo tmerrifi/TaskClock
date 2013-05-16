@@ -50,7 +50,6 @@ void task_clock_find_lowest(uint64_t * ticks){
   }*/
 
 void task_clock_overflow_handler(int is_nmi){
-  spin_lock(&_clock_spin_lock);
   printk(KERN_EMERG "Im in the overflow handler, \n");
   if (!access_ok(VERIFY_WRITE, task_clock_ticks(), sizeof(uint64_t))){
     printk(KERN_EMERG "in task_clock_overflow_handler: access is not ok\n");
@@ -59,7 +58,6 @@ void task_clock_overflow_handler(int is_nmi){
   //increment our tick count
   task_clock_ticks()[task_clock_tid()]++;
   printk(KERN_EMERG "ticks: %llu addr %p\n",   task_clock_ticks()[task_clock_tid()], &(task_clock_ticks()[task_clock_tid()]));
-  spin_unlock(&_clock_spin_lock);
 }
 
 struct task_clock_group_info * task_clock_group_init(){
