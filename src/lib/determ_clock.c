@@ -45,6 +45,8 @@ void * __create_shared_mem(){
     perror("mmap failed in determ_clock.c");
     exit(1);
   }
+  //lock it in to ram since we can't have page faults in NMI context in the kernel
+  mlock(mem, segment_size);
   return mem;
 }
 
@@ -63,44 +65,28 @@ __attribute__((constructor)) static void determ_clock_init(){
 
 //initialize the clock structure and call the perf object to actually set up the
 //instruction counting
-void determ_task_clock_init(u_int32_t tid){
-  task_clock_info.tid=tid;
-  printf("initing.....%d\n", (tid==0) ? -1 : task_clock_info.perf_counter->fd);
-  task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (tid==0) ? -1 : task_clock_info.perf_counter->fd );
+void determ_task_clock_init(){
+  task_clock_info.tid=__sync_fetch_and_add ( &(task_clock_info.tid), 1 );
+  printf("initing.....%d\n", (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd);
+  task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
 }
 
-void determ_task_clock_start(u_int32_t tid){
+void determ_task_clock_start(){
   perf_counter_start(task_clock_info.perf_counter);
 }
 
-u_int64_t determ_task_clock_read(u_int32_t tid){
+u_int64_t determ_task_clock_read(){
   perf_counter_stop(task_clock_info.perf_counter);
-  return clock_info->clocks[tid].ticks;
+  return clock_info->clocks[task_clock_info.tid].ticks;
 }
 
-//this will determine if we are the lowest clock in the system
-u_int32_t __determ_task_clock_get_lowest(u_int32_t tid, u_int64_t * min_ticks_out){
-  //ok, now its stopped so lets walk the array
-  u_int32_t min_tid=0;
-  u_int64_t min_ticks=ULLONG_MAX;
-  for(int i=0;i<DETERM_CLOCK_MAX_THREADS;++i){
-    if (clock_info->clocks[i].ticks < min_ticks){
-      min_ticks=clock_info->clocks[i].ticks;
-      min_tid=i;
-    }
-  }
-  *min_ticks_out=min_ticks;
-  //we also check to make sure that our is_lowest flag is set (from kernel space)
-  return min_tid;
-}
-
-void determ_task_clock_is_lowest_wait(u_int32_t tid){
+void determ_task_clock_is_lowest_wait(){
   perf_counter_stop(task_clock_info.perf_counter);
   return;
 }
 
 //lock is held when we enter
-void determ_task_clock_remove(u_int32_t tid){
+void determ_task_clock_remove(){
   perf_counter_stop(task_clock_info.perf_counter);
   
 }

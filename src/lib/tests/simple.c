@@ -13,9 +13,9 @@ void do_work(int work_count){
 }
 
 int test1(){
-  determ_task_clock_start(0);
+  determ_task_clock_start();
   do_work(5000);
-  printf("clock value is %d\n", determ_task_clock_read(0));
+  printf("clock value is %d\n", determ_task_clock_read());
 }
 
 

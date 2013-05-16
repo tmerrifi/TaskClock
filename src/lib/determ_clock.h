@@ -25,6 +25,7 @@
      volatile u_int64_t low_tid;
      struct determ_task_clock clocks[DETERM_CLOCK_MAX_THREADS];
      struct perf_counter_info * leader_perf_counter;
+     u_int64_t id_counter;
    };
 
 
@@ -37,9 +38,9 @@
 
 
    static void determ_clock_init();
-   void determ_task_clock_init(u_int32_t tid);
-   void determ_task_clock_start(u_int32_t tid);
-   u_int64_t determ_task_clock_read(u_int32_t tid);
+   void determ_task_clock_init();
+   void determ_task_clock_start();
+   u_int64_t determ_task_clock_read();
    u_int8_t determ_task_clock_is_lowest();
 
 #endif
