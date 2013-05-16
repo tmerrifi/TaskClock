@@ -4,13 +4,14 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <linux/perf_event.h>
+
 #include <asm/unistd.h>
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <syscall.h>
 #include <poll.h>
 
+#include "perf_event.h"
 #include "perf_counter.h"
 
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
