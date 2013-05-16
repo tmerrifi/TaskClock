@@ -25,6 +25,7 @@ int main(){
     pid_t pid = fork();
     if (pid==0){
       determ_task_clock_init();
+      printf("pid: %d\n", getpid());
       test1();
       sleep(1);
       test1();
