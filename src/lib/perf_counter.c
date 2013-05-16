@@ -55,7 +55,7 @@ struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t gr
   //16MB ring buffer
   if ((ring_buffer = mmap(NULL, PAGE_SIZE + (PAGE_SIZE * 4096) , PROT_READ | PROT_WRITE,
 			  MAP_SHARED, fd, 0)) == MAP_FAILED) {
-    printf("\nFAILED! %d fd %d\n", getpid(), fd);
+    printf("\nFAILED! %d fd %d %d\n", getpid(), fd, errno);
     perror("FAILED");
     close(fd);
     exit(EXIT_FAILURE);
