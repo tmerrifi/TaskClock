@@ -8,6 +8,7 @@
 #include <asm/unistd.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <asm-generic/mman-common.h>
 #include <syscall.h>
 #include <poll.h>
 
