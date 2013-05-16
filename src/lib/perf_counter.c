@@ -23,7 +23,7 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
     return ret;
 }
 
-struct perf_counter_info * perf_counter_init(u_int32_t sample_period){
+struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t group_fd){
 
   struct perf_event_attr pe;
   int fd;
@@ -39,7 +39,7 @@ struct perf_counter_info * perf_counter_init(u_int32_t sample_period){
   pe.exclude_hv = 1;
   pe.sample_period = sample_period;
   //pe.precise_ip = 3;
-  fd = perf_event_open(&pe, 0, -1, -1, 0);
+  fd = perf_event_open(&pe, 0, -1, group_fd, 0);
   if (fd == -1) {
     fprintf(stderr, "Error opening leader %llx\n", pe.config);
     exit(EXIT_FAILURE);

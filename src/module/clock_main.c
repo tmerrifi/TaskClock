@@ -10,13 +10,46 @@
 
 MODULE_LICENSE("GPL");
 
+//#define FIRST_BIT_SET 0x8000000000000000
+
 #define get_task_clock() (current->task_clock)
 
 #define task_clock_ticks() (current->task_clock.tick_arr)
 
 #define task_clock_tid() (current->task_clock.tid)
 
-void task_clock_overflow_handler(){
+/*#define set_first_bit(x) (x | FIRST_BIT_SET)
+
+#define clear_first_bit(x) (x & ~(FIRST_BIT_SET))
+
+#define first_bit_set(x) (x & FIRST_BIT_SET)
+
+void task_clock_find_lowest(uint64_t * ticks){
+  int i;
+  uint64_t min_ticks=~(0x0);
+  uint64_t tmp_ticks, new_val;
+  uint32_t min_tid;
+  uint8_t bit_set;
+
+  while(1){
+    i=0;
+    for (;i<TASK_CLOCK_MAX_THREADS;++i){
+      if (clear_first_bit(ticks[i]) < min_ticks){
+	min_ticks=clear_first_bit(ticks[i]);
+	min_tid=i;
+      }
+    }
+    //compute new value
+    new_val=set_first_bit(min_ticks);
+    //was there any trickery here? For example, this thread may have removed themselves from contention
+    if (atomic64_cmpxchg((atomic64_t *)(ticks + min_td), min_ticks, new_val) == min_ticks){
+      break;
+    }
+  }
+  }*/
+
+void task_clock_overflow_handler(int is_nmi){
+  spin_lock(&_clock_spin_lock);
   printk(KERN_EMERG "Im in the overflow handler, \n");
   if (!access_ok(VERIFY_WRITE, task_clock_ticks(), sizeof(uint64_t))){
     printk(KERN_EMERG "in task_clock_overflow_handler: access is not ok\n");
@@ -25,6 +58,7 @@ void task_clock_overflow_handler(){
   //increment our tick count
   task_clock_ticks()[task_clock_tid()]++;
   printk(KERN_EMERG "ticks: %llu addr %p\n",   task_clock_ticks()[task_clock_tid()], &(task_clock_ticks()[task_clock_tid()]));
+  spin_unlock(&_clock_spin_lock);
 }
 
 int init_module(void)

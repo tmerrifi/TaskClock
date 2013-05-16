@@ -6,6 +6,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
+#include <limits.h>
+#include <semaphore.h>
 
 #include "determ_clock.h"
 #include "perf_counter.h"
@@ -55,6 +57,7 @@ __attribute__((constructor)) static void determ_clock_init(){
   determ_task_clock_init(0);
   //now make a system call to open the task_clock in the kernel
   __make_clock_sys_call(clock_info->clocks, 0, task_clock_info.perf_counter->fd);
+  clock_info->leader_perf_counter=task_clock_info.perf_counter;
   printf("INITIALIZED\n");
 }
 
@@ -62,7 +65,8 @@ __attribute__((constructor)) static void determ_clock_init(){
 //instruction counting
 void determ_task_clock_init(u_int32_t tid){
   task_clock_info.tid=tid;
-  task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD);
+  printf("initing.....%d\n", (tid==0) ? -1 : task_clock_info.perf_counter->fd);
+  task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (tid==0) ? -1 : task_clock_info.perf_counter->fd );
 }
 
 void determ_task_clock_start(u_int32_t tid){
@@ -71,5 +75,32 @@ void determ_task_clock_start(u_int32_t tid){
 
 u_int64_t determ_task_clock_read(u_int32_t tid){
   perf_counter_stop(task_clock_info.perf_counter);
-  return clock_info->clocks[tid];
+  return clock_info->clocks[tid].ticks;
+}
+
+//this will determine if we are the lowest clock in the system
+u_int32_t __determ_task_clock_get_lowest(u_int32_t tid, u_int64_t * min_ticks_out){
+  //ok, now its stopped so lets walk the array
+  u_int32_t min_tid=0;
+  u_int64_t min_ticks=ULLONG_MAX;
+  for(int i=0;i<DETERM_CLOCK_MAX_THREADS;++i){
+    if (clock_info->clocks[i].ticks < min_ticks){
+      min_ticks=clock_info->clocks[i].ticks;
+      min_tid=i;
+    }
+  }
+  *min_ticks_out=min_ticks;
+  //we also check to make sure that our is_lowest flag is set (from kernel space)
+  return min_tid;
+}
+
+void determ_task_clock_is_lowest_wait(u_int32_t tid){
+  perf_counter_stop(task_clock_info.perf_counter);
+  return;
+}
+
+//lock is held when we enter
+void determ_task_clock_remove(u_int32_t tid){
+  perf_counter_stop(task_clock_info.perf_counter);
+  
 }
