@@ -20,7 +20,7 @@ int test1(){
 
 
 int main(){
-  int threads=1;
+  int threads=2;
   for(int i=0;i<threads;++i){
     if (fork()==0){
       determ_task_clock_init();
