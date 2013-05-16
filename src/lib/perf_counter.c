@@ -11,9 +11,11 @@
 #include <asm-generic/mman-common.h>
 #include <syscall.h>
 #include <poll.h>
+#include <errno.h>
 
 #include "perf_event.h"
 #include "perf_counter.h"
+
 
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
                 int cpu, int group_fd, unsigned long flags)
