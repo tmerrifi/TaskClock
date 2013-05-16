@@ -8,6 +8,8 @@
 #include <linux/uaccess.h>
 #include <linux/sched.h>
 #include <linux/task_clock.h>
+#include <linux/dcache.h>
+
 
 MODULE_LICENSE("GPL");
 
