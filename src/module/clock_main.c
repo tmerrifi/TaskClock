@@ -61,10 +61,18 @@ void task_clock_overflow_handler(int is_nmi){
   spin_unlock(&_clock_spin_lock);
 }
 
+struct task_clock_group_info * task_clock_group_init(){
+  struct task_clock_group_info * group_info = kmalloc(sizeof(struct task_clock_group_info), GFP_KERNEL);
+  spin_lock_init(&group_info->lock);
+  group_info->lowest_tid=-1;
+  return group_info;
+}
+
 int init_module(void)
 {
   printk(KERN_EMERG "initializing module\n");
   task_clock_func.task_clock_overflow_handler=task_clock_overflow_handler;
+  task_clock_func.task_clock_group_init=task_clock_group_init;
   return 0;
 }
 
