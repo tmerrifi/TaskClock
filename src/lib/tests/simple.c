@@ -20,11 +20,17 @@ int test1(){
 
 
 int main(){
-  if (test1()==1){
-    printf("TEST1: PASSED\n");
+  int threads=5;
+  for(int i=0;i<threads;++i){
+    if (fork()==0){
+      determ_task_clock_init();
+    }
+    else{
+      test1();
+      sleep(1);
+      test1();
+      sleep(1);
+      test1();
+    }
   }
-  else{
-    printf("TEST1: FAILED\n");
-  }
-
 }
