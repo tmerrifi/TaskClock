@@ -6,6 +6,8 @@ SOURCES = ./lib/perf_counter.o ./lib/determ_clock.o
 TESTS = clock_tests
 LIBS = -lrt
 
+all : dynlib module
+
 dynlib: $(SOURCES) 
 	gcc -shared $(CFLAGS) -o libHiDet.so $(SOURCES) $(LIBS); \
 	sudo cp libHiDet.so /usr/lib;
