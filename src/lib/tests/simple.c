@@ -22,15 +22,17 @@ int test1(){
 int main(){
   int threads=2;
   for(int i=0;i<threads;++i){
-    if (fork()==0){
+    pid_t pid = fork();
+    if (pid==0){
       determ_task_clock_init();
-    }
-    else{
       test1();
       sleep(1);
       test1();
       sleep(1);
       test1();
+      exit(1);
     }
   }
+  
+  sleep(5);
 }
