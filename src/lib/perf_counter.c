@@ -38,8 +38,9 @@ struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t gr
   pe.exclude_kernel = 1;
   pe.exclude_hv = 1;
   pe.sample_period = sample_period;
-  //pe.precise_ip = 3;
-  printf("size? %d\n", sizeof(pe.__reserved_1));
+  //this is our custom special flag!
+  pe.task_clock = 1;
+
   fd = perf_event_open(&pe, 0, -1, group_fd, 0);
   if (fd == -1) {
     fprintf(stderr, "Error opening leader %llx\n", pe.config);
