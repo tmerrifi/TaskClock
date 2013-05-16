@@ -58,8 +58,8 @@ void task_clock_overflow_handler(int is_nmi){
     return;
   }
   //increment our tick count
-  task_clock_ticks()[task_clock_tid()]++;
-  printk(KERN_EMERG "ticks: %llu addr %p\n",   task_clock_ticks()[task_clock_tid()], &(task_clock_ticks()[task_clock_tid()]));
+  //task_clock_ticks()[task_clock_tid()]++;
+  //printk(KERN_EMERG "ticks: %llu addr %p\n",   task_clock_ticks()[task_clock_tid()], &(task_clock_ticks()[task_clock_tid()]));
 }
 
 struct task_clock_group_info * task_clock_group_init(){
