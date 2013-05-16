@@ -67,7 +67,7 @@ __attribute__((constructor)) static void determ_clock_init(){
 //instruction counting
 void determ_task_clock_init(){
   task_clock_info.tid=__sync_fetch_and_add ( &(task_clock_info.tid), 1 );
-  printf("initing.....%d\n", (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd);
+  printf("initing.....%d %d\n", (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd, task_clock_info.tid);
   task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
 }
 
