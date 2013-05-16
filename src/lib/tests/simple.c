@@ -21,6 +21,8 @@ int test1(){
 
 int main(){
   int threads=5;
+  printf("first pid is %d\n", getpid());
+
   for(int i=0;i<threads;++i){
     pid_t pid = fork();
     if (pid==0){
