@@ -48,10 +48,23 @@ struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t gr
     exit(EXIT_FAILURE);
   }
 
+  void * ring_buffer;
+
+  //16MB ring buffer
+  if ((ring_buffer = mmap(NULL, PAGE_SIZE + (PAGE_SIZE * 4096) , PROT_READ | PROT_WRITE,
+			  MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+    printf("\nFAILED!\n");
+    close(fd);
+    exit(EXIT_FAILURE);
+  }  
+  madvise(ring_buffer, PAGE_SIZE + (PAGE_SIZE * 4096), MADV_DONTFORK);
+
   //setup the info object
   struct perf_counter_info * pci = malloc(sizeof(struct perf_counter_info));
   pci->pid=getpid();
   pci->fd=fd;
+  pci->ring_buffer_current=ring_buffer+PAGE_SIZE;
+  pci->ring_buffer=ring_buffer;
   return pci;
 }
 
@@ -80,7 +93,7 @@ struct perf_event_header * __move_one_record(struct perf_event_header * current)
   return (struct perf_event_header *)(((u_int8_t *) current) + current->size);
 }
 
-/*u_int64_t perf_counter_read(struct perf_counter_info * pci){
+u_int64_t perf_counter_read(struct perf_counter_info * pci){
   //walk through the ring buffer and count the sample records
   //long long count;
 
@@ -117,4 +130,4 @@ struct perf_event_header * __move_one_record(struct perf_event_header * current)
 
   pci->ring_buffer_current=event_header;
   return event_count;
-  }*/
+}
