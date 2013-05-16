@@ -3,6 +3,7 @@
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/path.h>
+#include <linux/pagemap.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
 #include <linux/sched.h>
