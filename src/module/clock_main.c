@@ -61,7 +61,7 @@ void pte_get_entry_from_address(struct mm_struct * mm, unsigned long addr){
 	pte_t * pte;
 	pmd_t *pmd;
 
-	pgd = pgd_offset(addr);
+	pgd = pgd_offset(mm, addr);
 	if (!pgd){
 		goto error;
 	}
