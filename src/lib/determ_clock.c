@@ -46,7 +46,7 @@ void * __create_shared_mem(){
     exit(1);
   }
   //lock it in to ram since we can't have page faults in NMI context in the kernel
-  //mlock(mem, segment_size);
+  mlock(mem, segment_size);
   return mem;
 }
 
