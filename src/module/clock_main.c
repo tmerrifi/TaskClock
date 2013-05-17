@@ -57,8 +57,9 @@ void task_clock_overflow_handler(int is_nmi){
     printk(KERN_EMERG "in task_clock_overflow_handler: access is not ok\n");
     return;
   }
+  printk(KERN_EMERG "??? %llu\n", *(task_clock_ticks()) );
   //increment our tick count
-  task_clock_ticks()[task_clock_tid()]++;
+  //task_clock_ticks()[task_clock_tid()]++;
   //printk(KERN_EMERG "ticks: %llu addr %p\n",   task_clock_ticks()[task_clock_tid()], &(task_clock_ticks()[task_clock_tid()]));
 }
 
