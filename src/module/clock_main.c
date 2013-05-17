@@ -6,6 +6,7 @@
 #include <linux/pagemap.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
+#include <asm/pgtable.h>
 #include <linux/sched.h>
 #include <linux/task_clock.h>
 #include <linux/slab.h>
