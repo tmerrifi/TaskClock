@@ -70,7 +70,7 @@ void determ_task_clock_init(){
   task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
   sleep(5);
   //now make a system call to open the task_clock in the kernel
-  __make_clock_sys_call(clock_info->clocks, task_clock_info.tid, task_clock_info.perf_counter->fd);
+  __make_clock_sys_call(task_clock_info.perf_counter->ring_buffer, task_clock_info.tid, task_clock_info.perf_counter->fd);
 }
 
 void determ_task_clock_start(){
