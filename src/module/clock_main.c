@@ -51,13 +51,51 @@ void task_clock_find_lowest(uint64_t * ticks){
   }
   }*/
 
+
+//return a pte given an address
+void pte_get_entry_from_address(struct mm_struct * mm, unsigned long addr){
+	
+	pgd_t * pgd;
+	pud_t *pud;
+	pte_t * pte;
+	pmd_t *pmd;
+
+	pgd = pgd_offset(addr);
+	if (!pgd){
+		goto error;
+	}
+	pud = pud_offset(pgd, addr);
+	if (!pud){
+		goto error;
+	}
+	pmd = pmd_offset(pud, addr);
+	if (!pmd){
+		goto error;	
+	}
+	pte = pte_offset_map(pmd, addr);
+	if (!pte){
+		goto error;
+	}
+
+	printk(KERN_EMERG "PFN %lu\n", pte_pfn(*pte));
+
+	return pte;
+	
+	error:
+		return NULL;
+}
+
+
+
 void task_clock_overflow_handler(int is_nmi){
   printk(KERN_EMERG "Im in the overflow handler, \n");
   if (!access_ok(VERIFY_WRITE, task_clock_ticks(), sizeof(uint64_t))){
     printk(KERN_EMERG "in task_clock_overflow_handler: access is not ok\n");
     return;
   }
-  printk(KERN_EMERG "??? %llu\n", *(task_clock_ticks()) );
+
+  pte_get_entry_from_address(current->mm, &(task_clock_ticks()[task_clock_tid()]));
+
   //increment our tick count
   //task_clock_ticks()[task_clock_tid()]++;
   //printk(KERN_EMERG "ticks: %llu addr %p\n",   task_clock_ticks()[task_clock_tid()], &(task_clock_ticks()[task_clock_tid()]));
