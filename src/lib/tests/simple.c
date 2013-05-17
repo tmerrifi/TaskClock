@@ -29,13 +29,12 @@ int main(){
       determ_task_clock_init();
       printf("pid: %d\n", getpid());
       test1();
-      sleep(3);
+      sleep(1);
       test1();
-      sleep(3);
+      sleep(1);
       test1();
       exit(1);
     }
-    sleep(4);
   }
   
   sleep(5);

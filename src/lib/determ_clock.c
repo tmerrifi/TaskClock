@@ -46,7 +46,7 @@ void * __create_shared_mem(){
     exit(1);
   }
   //lock it in to ram since we can't have page faults in NMI context in the kernel
-  mlock(mem, segment_size);
+  //mlock(mem, segment_size);
   return mem;
 }
 
@@ -67,8 +67,8 @@ __attribute__((constructor)) static void determ_clock_init(){
 //instruction counting
 void determ_task_clock_init(){
   task_clock_info.tid=__sync_fetch_and_add ( &(clock_info->id_counter), 1 );
-  printf("initing.....%d %d ticks %d\n", (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd, task_clock_info.tid, clock_info->clocks[task_clock_info.tid] );
-  task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, -1); //(task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
+  printf("initing.....%d %d ticks %d\n", (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd, task_clock_info.tid, clock_info->clocks[task_clock_info.tid].ticks );
+  task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
 }
 
 void determ_task_clock_start(){
