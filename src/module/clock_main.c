@@ -95,7 +95,7 @@ void task_clock_overflow_handler(int is_nmi){
     return;
   }
 
-  //pte_get_entry_from_address(current->mm, &(task_clock_ticks()[task_clock_tid()]));
+  pte_get_entry_from_address(current->mm, &(task_clock_ticks()[task_clock_tid()]));
 
   //increment our tick count
   task_clock_ticks()[task_clock_tid()]++;
