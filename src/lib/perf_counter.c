@@ -62,7 +62,6 @@ struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t gr
     close(fd);
     exit(EXIT_FAILURE);
   }  
-  //madvise(ring_buffer, PAGE_SIZE + (PAGE_SIZE * 4096), MADV_NORMAL);
 
   //setup the info object
   struct perf_counter_info * pci = malloc(sizeof(struct perf_counter_info));
