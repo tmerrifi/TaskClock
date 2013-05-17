@@ -35,6 +35,7 @@ int main(){
       test1();
       exit(1);
     }
+    sleep(1);
   }
   
   sleep(5);
