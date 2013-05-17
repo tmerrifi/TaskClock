@@ -20,7 +20,7 @@ int test1(){
 
 
 int main(){
-  int threads=1;
+  int threads=2;
   printf("first pid is %d\n", getpid());
 
   for(int i=0;i<threads;++i){
