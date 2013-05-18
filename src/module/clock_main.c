@@ -95,13 +95,14 @@ void task_clock_overflow_handler(int is_nmi){
   //return;
   //}
 
-  if (pte_get_entry_from_address(current->mm, &(task_clock_ticks()[task_clock_tid()]))){
+  //if (pte_get_entry_from_address(current->mm, &(task_clock_ticks()[task_clock_tid()]))){
       //increment our tick count
-    task_clock_ticks()[task_clock_tid()]++;
-  }
-  else{
-    printk(KERN_EMERG "something went wrong\n");
-  }
+  task_clock_ticks()[task_clock_tid()]++;
+  printk(KERN_EMERG " Ticks is %llu for pid %d\n", task_clock_ticks()[task_clock_tids()], getpid());
+  //}
+  //else{
+  //printk(KERN_EMERG "something went wrong\n");
+  //}
 
 
   //printk(KERN_EMERG "ticks: %llu addr %p\n",   task_clock_ticks()[task_clock_tid()], &(task_clock_ticks()[task_clock_tid()]));
