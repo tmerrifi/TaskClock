@@ -30,13 +30,13 @@ void __make_clock_sys_call(void * address, u_int64_t tid, u_int64_t fd){
 }
 
 //sick of writing this boiler plate mmap code! :( Oh well!
-void * __create_shared_mem(){
+void * __create_shared_mem(char * file_name){
   int fd;
   void * mem;
   u_int64_t segment_size=sizeof(struct determ_clock_info);
 
-  sprintf(clock_info->clock_file_name, "TASK_CLOCK_XXXXXX");
-  if ((fd = mkstemp(clock_info->clock_file_name))==-1){
+  sprintf(file_name, "TASK_CLOCK_XXXXXX");
+  if ((fd = mkstemp(file_name))==-1){
     perror("couldn't open the shared mem file from determ_clock.c");
     exit(1);
   }
@@ -67,9 +67,11 @@ void * __open_shared_mem(){
 
 __attribute__((constructor)) static void determ_clock_init(){
   //TODO: this needs to be shared memory..
-  clock_info = __create_shared_mem();
+  char file_name[200];
+  clock_info = __create_shared_mem(file_name);
   //zero out the memory
   memset(clock_info->clocks, 0, sizeof(struct determ_clock_info));
+  strcpy(clock_info->clock_file_name, file_name);
   //initialize the first clock now
   determ_task_clock_init(0);
   clock_info->leader_perf_counter=task_clock_info.perf_counter;
