@@ -98,7 +98,7 @@ void task_clock_overflow_handler(int is_nmi){
   //if (pte_get_entry_from_address(current->mm, &(task_clock_ticks()[task_clock_tid()]))){
       //increment our tick count
   task_clock_ticks()[task_clock_tid()]++;
-  printk(KERN_EMERG " Ticks is %llu for pid %d\n", task_clock_ticks()[task_clock_tid()], getpid());
+  printk(KERN_EMERG " Ticks is %llu for pid %d\n", task_clock_ticks()[task_clock_tid()], current->pid);
   //}
   //else{
   //printk(KERN_EMERG "something went wrong\n");
