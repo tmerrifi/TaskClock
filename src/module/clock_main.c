@@ -88,18 +88,28 @@ pte_t * pte_get_entry_from_address(struct mm_struct * mm, unsigned long addr){
 }
 
 void __task_clock_notify_waiting_threads(struct irq_work * work){
+  unsigned long flags;
+  spin_lock_irqsave(&group_info->lock, flags);
   printk(KERN_EMERG "NOTIFY!!!\n");
+  spin_unlock_irqsave(&group_info->lock, flags);
 }
 
-void task_clock_overflow_handler(int is_nmi){
+void task_clock_overflow_handler(struct task_clock_group_info * group_info){
+  unsigned long flags;
+  spin_lock_irqsave(&group_info->nmi_lock, flags);
   task_clock_ticks()[task_clock_tid()]++;
+  group_info->pending=0;
+  irq_work_queue(group_info->pending_work);
+  spin_unlock_irqsave(&group_info->nmi_lock, flags);
   //printk(KERN_EMERG " Ticks is %llu for pid %d\n", task_clock_ticks()[task_clock_tid()], current->pid);
 }
 
 struct task_clock_group_info * task_clock_group_init(){
   struct task_clock_group_info * group_info = kmalloc(sizeof(struct task_clock_group_info), GFP_KERNEL);
+  spin_lock_init(&group_info->nmi_lock);
   spin_lock_init(&group_info->lock);
   group_info->lowest_tid=-1;
+  group_info->pending=0;
   init_irq_work(group_info->pending_work, __task_clock_notify_waiting_threads);
   return group_info;
 }
