@@ -99,7 +99,7 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   spin_lock_irqsave(&group_info->nmi_lock, flags);
   task_clock_ticks()[task_clock_tid()]++;
   group_info->pending=0;
-  irq_work_queue(group_info->pending_work);
+  irq_work_queue(&group_info->pending_work);
   spin_unlock_irqsave(&group_info->nmi_lock, flags);
   //printk(KERN_EMERG " Ticks is %llu for pid %d\n", task_clock_ticks()[task_clock_tid()], current->pid);
 }
@@ -110,7 +110,7 @@ struct task_clock_group_info * task_clock_group_init(){
   spin_lock_init(&group_info->lock);
   group_info->lowest_tid=-1;
   group_info->pending=0;
-  init_irq_work(group_info->pending_work, __task_clock_notify_waiting_threads);
+  init_irq_work(&group_info->pending_work, __task_clock_notify_waiting_threads);
   return group_info;
 }
 
