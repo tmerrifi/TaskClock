@@ -36,7 +36,7 @@ void * __create_shared_mem(){
   u_int64_t segment_size=sizeof(struct determ_clock_info);
 
   sprintf(clock_info->clock_file_name, "TASK_CLOCK_XXXXXX");
-  if ((fd = mkstemp(file_path))==-1){
+  if ((fd = mkstemp(clock_info->clock_file_name))==-1){
     perror("couldn't open the shared mem file from determ_clock.c");
     exit(1);
   }
