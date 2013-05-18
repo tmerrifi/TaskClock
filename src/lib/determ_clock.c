@@ -70,7 +70,6 @@ __attribute__((constructor)) static void determ_clock_init(){
   char file_name[200];
   clock_info = __create_shared_mem(file_name);
   //zero out the memory
-  memset(clock_info->clocks, 0, sizeof(struct determ_clock_info));
   strcpy(clock_info->clock_file_name, file_name);
   //initialize the first clock now
   determ_task_clock_init(0);
@@ -85,10 +84,7 @@ void determ_task_clock_init(){
   if (task_clock_info.tid!=0){
     clock_info=__open_shared_mem();
   }
-  printf("initing.....%d %d ticks %d %p pid %d\n", 
-	 (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd, 
-	 task_clock_info.tid, clock_info->clocks[task_clock_info.tid].ticks, &(clock_info->clocks[task_clock_info.tid].ticks), getpid()  );
-  __make_clock_sys_call(clock_info->clocks, task_clock_info.tid, 0);
+  __make_clock_sys_call(NULL, task_clock_info.tid, 0);
   task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
 
 }
@@ -99,7 +95,7 @@ void determ_task_clock_start(){
 
 u_int64_t determ_task_clock_read(){
   perf_counter_stop(task_clock_info.perf_counter);
-  return clock_info->clocks[task_clock_info.tid].ticks;
+  return 0;
 }
 
 void determ_task_clock_is_lowest_wait(){
