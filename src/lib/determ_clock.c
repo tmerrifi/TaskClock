@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <asm-generic/mman.h>
 #include <sys/syscall.h>
 #include <limits.h>
 #include <semaphore.h>
