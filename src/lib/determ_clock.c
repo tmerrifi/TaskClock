@@ -32,10 +32,9 @@ void __make_clock_sys_call(void * address, u_int64_t tid, u_int64_t fd){
 void * __create_shared_mem(){
   int fd;
   void * mem;
-  char file_path[200];
   u_int64_t segment_size=sizeof(struct determ_clock_info);
 
-  sprintf(file_path, "TASK_CLOCK_XXXXXX");
+  sprintf(clock_info->clock_file_name, "TASK_CLOCK_XXXXXX");
   if ((fd = mkstemp(file_path))==-1){
     perror("couldn't open the shared mem file from determ_clock.c");
     exit(1);
@@ -47,6 +46,21 @@ void * __create_shared_mem(){
   }
   //lock it in to ram since we can't have page faults in NMI context in the kernel
   mlock(mem, segment_size);
+  return mem;
+}
+
+void * __open_shared_mem(){
+  int fd;
+  void * mem;
+  fd = open(clock_info->clock_file_name, O_RDWR, 0644);
+  if (fd==-1){
+    perror("couldn't open the shared mem file");
+    exit(1);
+  }
+  if ((mem = mmap(NULL,sizeof(struct determ_clock_info),PROT_READ | PROT_WRITE,MAP_SHARED | MAP_POPULATE,fd,0))==NULL){
+    perror("mmap failed in determ_clock.c");
+    exit(1);
+  }
   return mem;
 }
 
@@ -65,12 +79,14 @@ __attribute__((constructor)) static void determ_clock_init(){
 //instruction counting
 void determ_task_clock_init(){
   task_clock_info.tid=__sync_fetch_and_add ( &(clock_info->id_counter), 1 );
+  if (task_clock_info.tid!=0){
+    clock_info=__open_shared_mem();
+  }
   printf("initing.....%d %d ticks %d %p pid %d\n", 
-	 (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd, task_clock_info.tid, clock_info->clocks[task_clock_info.tid].ticks, &(clock_info->clocks[task_clock_info.tid].ticks), getpid()  );
+	 (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd, 
+	 task_clock_info.tid, clock_info->clocks[task_clock_info.tid].ticks, &(clock_info->clocks[task_clock_info.tid].ticks), getpid()  );
   __make_clock_sys_call(clock_info->clocks, task_clock_info.tid, 0);
   task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
-  sleep(3);
-  //now make a system call to open the task_clock in the kernel
 
 }
 
