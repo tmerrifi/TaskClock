@@ -31,7 +31,7 @@
 
 
    //how many instructions to count before generating a sample
-#define DETERM_CLOCK_SAMPLE_PERIOD 2000
+#define DETERM_CLOCK_SAMPLE_PERIOD 50
 
 #define DETERM_CLOCK_NOT_WAITING 0
 #define DETERM_CLOCK_LOWEST 1
