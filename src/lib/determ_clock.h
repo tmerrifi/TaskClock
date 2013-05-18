@@ -21,9 +21,9 @@
    } __attribute__ ((aligned (8)));
 
    struct determ_clock_info{
-     volatile u_int64_t low_ticks;
+     /*volatile u_int64_t low_ticks;
      volatile u_int64_t low_tid;
-     struct determ_task_clock clocks[DETERM_CLOCK_MAX_THREADS];
+     struct determ_task_clock clocks[DETERM_CLOCK_MAX_THREADS];*/
      struct perf_counter_info * leader_perf_counter;
      u_int64_t id_counter;
      char clock_file_name[200];

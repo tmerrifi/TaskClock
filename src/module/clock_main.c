@@ -18,7 +18,7 @@ MODULE_LICENSE("GPL");
 
 #define get_task_clock() (current->task_clock)
 
-#define task_clock_ticks() (current->task_clock.tick_arr)
+#define task_clock_ticks() (current->task_clock.clocks)
 
 #define task_clock_tid() (current->task_clock.tid)
 
