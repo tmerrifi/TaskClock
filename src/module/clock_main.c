@@ -54,7 +54,7 @@ void task_clock_find_lowest(uint64_t * ticks){
 
 
 //return a pte given an address
-void pte_get_entry_from_address(struct mm_struct * mm, unsigned long addr){
+pte_t * pte_get_entry_from_address(struct mm_struct * mm, unsigned long addr){
 	
 	pgd_t * pgd;
 	pud_t *pud;
