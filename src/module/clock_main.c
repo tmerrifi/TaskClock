@@ -78,7 +78,7 @@ pte_t * pte_get_entry_from_address(struct mm_struct * mm, unsigned long addr){
 		goto error;
 	}
 
-	printk(KERN_EMERG "PFN %lu\n", pte_pfn(*pte));
+	printk(KERN_EMERG "PFN %lu pid %d\n", pte_pfn(*pte), current->pid);
 
 	return pte;
 	
