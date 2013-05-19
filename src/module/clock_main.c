@@ -91,7 +91,6 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
   unsigned long flags;
   struct task_clock_group_info * group_info = container_of(work, struct task_clock_group_info, pending_work);
   spin_lock_irqsave(&group_info->lock, flags);
-  printk(KERN_EMERG "NOTIFY!!!\n");
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
