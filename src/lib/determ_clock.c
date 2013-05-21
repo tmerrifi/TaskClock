@@ -9,6 +9,7 @@
 #include <sys/syscall.h>
 #include <limits.h>
 #include <semaphore.h>
+#include <poll.h>
 
 #include "determ_clock.h"
 #include "perf_counter.h"
