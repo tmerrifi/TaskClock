@@ -183,6 +183,7 @@ void task_clock_entry_init(struct task_clock_group_info * group_info){
   event = container_of(group_info, struct perf_event, task_clock_group);
   printk(KERN_EMERG "event is %p\n", event);
   group_info->clocks[current->task_clock.tid].event=event;
+  group_info->clocks[current->task_clock.tid].ticks=0;
 }
 
 struct task_clock_group_info * task_clock_group_init(void){
