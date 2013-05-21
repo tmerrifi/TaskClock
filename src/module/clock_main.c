@@ -200,6 +200,7 @@ int init_module(void)
   printk(KERN_EMERG "initializing module\n");
   task_clock_func.task_clock_overflow_handler=task_clock_overflow_handler;
   task_clock_func.task_clock_group_init=task_clock_group_init;
+  task_clock_func.task_clock_entry_init=task_clock_entry_init;
   return 0;
 }
 
