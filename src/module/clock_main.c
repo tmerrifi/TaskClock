@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/irq_work.h>
 #include <linux/wait.h>
+#include <linux/perf_event.h>
 
 
 MODULE_LICENSE("GPL");
