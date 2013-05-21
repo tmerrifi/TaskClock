@@ -84,7 +84,6 @@ int __is_lowest(struct task_clock_group_info * group_info, int32_t tid){
 
 int32_t __search_for_lowest(struct task_clock_group_info * group_info){
   int i=0;
-  uint64_t min_ticks=1ULL<<63;
   int32_t min_tid=-1;
   for (;i<TASK_CLOCK_MAX_THREADS;++i){
     struct task_clock_entry_info * entry = &group_info->clocks[i];
@@ -173,7 +172,7 @@ void __init_task_clock_entries(struct task_clock_group_info * group_info){
     entry->fd=-1;
     entry->waiting=0;
     entry->inactive=0;
-    entry->ticks=(1<<63);
+    entry->ticks=(1ULL<<63);
   }
 }
 
