@@ -84,9 +84,13 @@ void determ_task_clock_init(){
   if (task_clock_info.tid!=0){
     clock_info=__open_shared_mem();
   }
-  __make_clock_sys_call(NULL, task_clock_info.tid, 0);
+  task_clock_info.user_status = malloc(sizeof(struct task_clock_user_status));
+  memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
+  //set up the task clock for our process
+  __make_clock_sys_call(task_clock_user_status.user_status, task_clock_info.tid, 0);
+  //set up the performance counter
   task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
-
+  
 }
 
 void determ_task_clock_start(){
@@ -99,7 +103,19 @@ u_int64_t determ_task_clock_read(){
 }
 
 void determ_task_clock_is_lowest_wait(){
+  //stop the counter
   perf_counter_stop(task_clock_info.perf_counter);
+  //are we the lowest? If we are, no reason to wait around
+  if (!task_clock_info.user_status->lowest_clock){
+    //poll on the fd of the perf_event
+    struct pollfd * fds = malloc(sizeof(struct pollfd));
+    memset(fds, 0, sizeof(struct pollfd));
+    fds->fd = task_clock_info.perf_counter->fd;
+    fds->events = POLLIN;
+    poll(fds, 1, -1);
+  }
+
+  task_clock_info.user_status->lowest_clock=0;
   return;
 }
 

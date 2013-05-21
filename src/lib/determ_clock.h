@@ -11,9 +11,15 @@
 
 #define DETERM_CLOCK_MAX_THREADS 1024
 
+   //used by userspace to know what is going on                                                                         
+   struct task_clock_user_status{
+     uint8_t lowest_clock; //set when you inactivate the clock                                                          
+   };
+
    struct determ_task_clock_info{
      u_int32_t tid;
      struct perf_counter_info * perf_counter;
+     struct task_clock_user_status * user_status;
    };
 
    struct determ_task_clock{
