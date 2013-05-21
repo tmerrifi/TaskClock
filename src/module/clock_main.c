@@ -157,6 +157,7 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
 //userspace is disabling the clock. Perhaps they are about to start waiting to be named the lowest. In that
 //case, we need to figure out if they are the lowest and let them know before they call poll
 void task_clock_on_disable(struct task_clock_group_info * group_info){
+  unsigned long flags;
   spin_lock_irqsave(&group_info->lock, flags);
   //am I the lowest?
   if(group_info->lowest_tid == current->task_clock.tid){
