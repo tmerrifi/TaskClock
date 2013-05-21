@@ -13,7 +13,7 @@
 
    //used by userspace to know what is going on                                                                         
    struct task_clock_user_status{
-     uint8_t lowest_clock; //set when you inactivate the clock                                                          
+     u_int8_t lowest_clock; //set when you inactivate the clock                                                          
    };
 
    struct determ_task_clock_info{
