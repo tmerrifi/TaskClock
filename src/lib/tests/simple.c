@@ -12,9 +12,9 @@ void do_work(int work_count){
   }
 }
 
-int test1(){
+int test1(int work){
   determ_task_clock_start();
-  do_work(5000);
+  do_work(work);
   printf("clock value is %d\n", determ_task_clock_read());
 }
 
@@ -27,12 +27,12 @@ int main(){
     pid_t pid = fork();
     if (pid==0){
       determ_task_clock_init();
-      printf("pid: %d\n", getpid());
-      test1();
+      printf("pid: %d %d\n", getpid(), i);
+      test1((i+1)*10000);
       sleep(1);
-      test1();
+      test1((i+1)*10000);
       sleep(1);
-      test1();
+      test1((i+1)*10000);
       exit(1);
     }
   }
