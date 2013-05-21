@@ -11,6 +11,7 @@
 #include <linux/task_clock.h>
 #include <linux/slab.h>
 #include <linux/irq_work.h>
+#include <linux/wait.h>
 
 
 MODULE_LICENSE("GPL");
