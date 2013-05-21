@@ -182,7 +182,7 @@ void task_clock_entry_init(struct task_clock_group_info * group_info){
   group_info->clocks[current->task_clock.tid].event=event;
 }
 
-struct task_clock_group_info * task_clock_group_init(){
+struct task_clock_group_info * task_clock_group_init(void){
   struct task_clock_group_info * group_info = kmalloc(sizeof(struct task_clock_group_info), GFP_KERNEL);
   spin_lock_init(&group_info->nmi_lock);
   spin_lock_init(&group_info->lock);
