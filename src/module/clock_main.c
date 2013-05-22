@@ -180,9 +180,10 @@ void __init_task_clock_entries(struct task_clock_group_info * group_info){
 
 void task_clock_entry_init(struct task_clock_group_info * group_info, struct perf_event * event){
   //store the event pointer to use later
-  printk(KERN_EMERG "event is %p\n", event);
+
   group_info->clocks[current->task_clock.tid].event=event;
   group_info->clocks[current->task_clock.tid].ticks=0;
+  printk(KERN_EMERG "event is %p....ticks are %llu \n", event, __get_clock_ticks(group_info, current->task_clock.tid));
 }
 
 struct task_clock_group_info * task_clock_group_init(void){
