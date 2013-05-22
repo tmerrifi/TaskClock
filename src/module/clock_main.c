@@ -159,6 +159,7 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
   spin_lock_irqsave(&group_info->lock, flags);
   //am I the lowest?
   if(group_info->lowest_tid == current->task_clock.tid){
+    printk(KERN_EMERG "On Disable...%d is lowest with %llu ticks\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
     current->task_clock.user_status->lowest_clock=1;
   }
   spin_unlock_irqrestore(&group_info->lock, flags);
