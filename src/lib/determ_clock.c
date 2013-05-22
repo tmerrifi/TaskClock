@@ -92,8 +92,8 @@ void determ_task_clock_init(){
   //set up the task clock for our process
   __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
   //set up the performance counter
+  printf("HERE???????\n");
   task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
-  
 }
 
 
