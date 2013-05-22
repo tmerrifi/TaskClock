@@ -29,11 +29,11 @@ int main(){
       determ_task_clock_init();
       printf("pid: %d %d\n", getpid(), i);
       test1((i+1)*10000);
-      sleep(1);
+      determ_task_clock_is_lowest_wait();
       test1((i+1)*10000);
-      sleep(1);
+      determ_task_clock_is_lowest_wait();
       test1((i+1)*10000);
-      exit(1);
+      determ_task_clock_is_lowest_wait();
     }
   }
   
