@@ -27,13 +27,14 @@ int main(){
     pid_t pid = fork();
     if (pid==0){
       determ_task_clock_init();
-      printf("pid: %d %d\n", getpid(), i);
       test1((i+1)*10000);
       determ_task_clock_is_lowest_wait();
       test1((i+1)*10000);
       determ_task_clock_is_lowest_wait();
+      determ_task_clock_remove();
       test1((i+1)*10000);
       determ_task_clock_is_lowest_wait();
+      determ_task_clock_remove();
     }
   }
   
