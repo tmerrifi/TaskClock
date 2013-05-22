@@ -36,6 +36,7 @@ int main(){
       test1((i+1)*10000);
       determ_task_clock_is_lowest_wait();
       determ_task_clock_halt();
+      exit(1);
     }
     else{
       threads[i]=pid;
