@@ -75,7 +75,8 @@ __attribute__((constructor)) static void determ_clock_init(){
   //zero out the memory
   strcpy(clock_info->clock_file_name, file_name);
   //initialize the first clock now
-  determ_task_clock_init(0);
+  printf("what about here?\n");
+  determ_task_clock_init();
   clock_info->leader_perf_counter=task_clock_info.perf_counter;
   printf("INITIALIZED\n");
 }
