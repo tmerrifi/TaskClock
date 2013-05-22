@@ -238,6 +238,8 @@ int init_module(void)
   task_clock_func.task_clock_entry_init=task_clock_entry_init;
   task_clock_func.task_clock_entry_activate=task_clock_entry_activate;
   task_clock_func.task_clock_entry_halt=task_clock_entry_halt;
+  task_clock_func.task_clock_on_disable=task_clock_on_disable;
+
   return 0;
 }
 
