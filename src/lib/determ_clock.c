@@ -31,7 +31,7 @@ struct determ_task_clock_info task_clock_info;
 
 //making a simple system call to let the kernel know where the tick array is located
 void __make_clock_sys_call(void * address, u_int64_t tid, u_int64_t fd){
-  struct ftracer * tracer
+  struct ftracer * tracer;
   if (tid==1){
     tracer = ftrace_init();
     ftrace_on(tracer);
