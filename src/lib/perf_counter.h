@@ -7,7 +7,7 @@
 #ifndef PERF_COUNTER_H
 #define PERF_COUNTER_H
 
-#include <linux/perf_event.h>
+#include "perf_event.h"
 #include <sys/types.h>
 
    #define PAGE_SIZE 4096
