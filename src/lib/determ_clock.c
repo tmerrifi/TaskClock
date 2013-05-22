@@ -14,6 +14,7 @@
 
 #include "determ_clock.h"
 #include "perf_counter.h"
+#include "perf_event.h"
 
 struct determ_clock_info * clock_info;
 struct determ_task_clock_info task_clock_info;
