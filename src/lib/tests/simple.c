@@ -28,6 +28,7 @@ int main(){
     pid_t pid = fork();
     if (pid==0){
       determ_task_clock_init();
+      sleep(5);
       /*test1((i+1)*100000);
       determ_task_clock_is_lowest_wait();
       test1((i+1)*100000);
@@ -44,7 +45,7 @@ int main(){
   }
   
   int status;
-  sleep(2);
+  sleep(10);
   /*  for(int i=0;i<thread_count;++i){
     waitpid(threads[i], &status, 0);
     }*/
