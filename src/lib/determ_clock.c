@@ -11,6 +11,7 @@
 #include <semaphore.h>
 #include <poll.h>
 #include <sys/ioctl.h>
+#include <sched.h>
 
 #include "determ_clock.h"
 #include "perf_counter.h"
@@ -29,7 +30,7 @@ struct determ_task_clock_info task_clock_info;
 //making a simple system call to let the kernel know where the tick array is located
 void __make_clock_sys_call(void * address, u_int64_t tid, u_int64_t fd){
   syscall(__TASK_CLOCK_SYS_CALL, fd, (unsigned long)address, tid);
-  printf("came back from the sys call %d\n", getpid());
+  printf("came back from the sys call %d cpu %d\n", getpid(), sched_getcpu());
 }
 
 //sick of writing this boiler plate mmap code! :( Oh well!
@@ -92,7 +93,7 @@ void determ_task_clock_init(){
   }
   task_clock_info.user_status = malloc(sizeof(struct task_clock_user_status));
   memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
-  printf("HERE 2 ??????? tid %d pid %d\n", task_clock_info.tid, getpid());
+  printf("HERE 2 ??????? tid %d pid %d cpu %d\n", task_clock_info.tid, getpid(), sched_getcpu());
   //set up the task clock for our process
   __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
   //set up the performance counter
