@@ -96,9 +96,7 @@ void determ_task_clock_init(){
   
 }
 
-void determ_task_clock_start(){
-  perf_counter_start(task_clock_info.perf_counter);
-}
+
 
 u_int64_t determ_task_clock_read(){
   perf_counter_stop(task_clock_info.perf_counter);
@@ -122,11 +120,22 @@ void determ_task_clock_is_lowest_wait(){
   return;
 }
 
+void determ_task_clock_activate(){
+  if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_START, 0) != 0){
+    printf("\nClock start failed\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+void determ_task_clock_start(){
+  perf_counter_start(task_clock_info.perf_counter);
+}
+
 //lock is held when we enter
-void determ_task_clock_remove(){
+void determ_task_clock_halt(){
   perf_counter_stop(task_clock_info.perf_counter);
-  if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_REMOVE, 0) != 0){
-    printf("\nreset wrong\n");
+  if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){
+    printf("\nHalt failed\n");
     exit(EXIT_FAILURE);
   }
 }

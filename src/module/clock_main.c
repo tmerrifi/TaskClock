@@ -98,10 +98,6 @@ int32_t __new_lowest(struct task_clock_group_info * group_info, int32_t tid){
   int32_t new_low=-1;
   int32_t tmp;
 
-  //it hasn't been initialized yet
-  if (group_info->lowest_tid<0){
-    new_low=tid;
-  }
   //am I the current lowest?
   if (tid==group_info->lowest_tid && ((tmp=__search_for_lowest(group_info))!=tid) ){
     //looks like things have changed...someone else is the lowest
@@ -198,12 +194,48 @@ struct task_clock_group_info * task_clock_group_init(void){
   return group_info;
 }
 
+void task_clock_entry_halt(struct task_clock_group_info * group_info){
+  unsigned long flags;
+  int32_t new_low=-1;
+  printk(KERN_EMERG "HALTING %d\n", current->task_clock.tid);
+  //first, check if we're the lowest
+  spin_lock_irqsave(&group_info->lock, flags);
+  //make us inactive
+  group_info->clocks[current->task_clock.tid].inactive=1;
+  //are we the lowest?
+  if (group_info->lowest_tid==current->task_clock.tid){
+    //we need to find the new lowest and set it
+    new_low=__new_lowest(group_info, current->task_clock.tid);
+    //is there a new_low?
+    group_info->lowest_tid=(new_low >= 0) ? new_low : -1;
+    printk(KERN_EMERG "----HALTING %d, setting new low to %d\n", current->task_clock.tid, group_info->lowest_tid);
+    if (new_low >= 0 && __new_low_is_waiting(group_info, new_low)){
+      //lets wake it up
+      printk(KERN_EMERG "----HALTING SIGNALING NEW LOW!\n");
+      group_info->pending=1;
+      irq_work_queue(&group_info->pending_work);
+    }
+  }
+  spin_unlock_irqrestore(&group_info->lock, flags);
+}
+
+void task_clock_entry_activate(struct task_clock_group_info * group_info){
+  unsigned long flags;
+  printk(KERN_EMERG "RESTARTING %d\n", current->task_clock.tid);
+  group_info->clocks[current->task_clock.tid].inactive=0;
+  //spin_lock_irqsave(&group_info->lock, flags);
+  
+  //spin_unlock_irqrestore(&group_info->lock, flags);
+}
+
 int init_module(void)
 {
   printk(KERN_EMERG "initializing module\n");
   task_clock_func.task_clock_overflow_handler=task_clock_overflow_handler;
   task_clock_func.task_clock_group_init=task_clock_group_init;
   task_clock_func.task_clock_entry_init=task_clock_entry_init;
+  task_clock_func.task_clock_entry_activate=task_clock_entry_activate;
+  task_clock_func.task_clock_entry_halt=task_clock_entry_halt;
   return 0;
 }
 
