@@ -1,7 +1,7 @@
 
 SHELL = /bin/bash
 SOURCES = simple
-FLAGS = -g -std=c99 -lHiDet
+FLAGS = -g -std=c99 -lHiDet -lksnap
 
 all : $(SOURCES)
 
