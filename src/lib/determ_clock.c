@@ -121,7 +121,7 @@ void determ_task_clock_is_lowest_wait(){
 }
 
 void determ_task_clock_activate(){
-  if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_START, 0) != 0){
+  if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE, 0) != 0){
     printf("\nClock start failed\n");
     exit(EXIT_FAILURE);
   }
