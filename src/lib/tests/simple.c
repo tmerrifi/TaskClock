@@ -28,7 +28,7 @@ int main(){
     pid_t pid = fork();
     if (pid==0){
       determ_task_clock_init();
-      test1((i+1)*100000);
+      test1((i+1)*10000000);
       printf("%d done with work\n", getpid());
       /*determ_task_clock_is_lowest_wait();
       test1((i+1)*100000);
