@@ -124,7 +124,7 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
     group_info->pending=0;
     //wake it up
     printk(KERN_EMERG "waking up %d\n", group_info->lowest_tid);
-    wake_up_all(&event->waitq);
+    wake_up_all(&event->task_clock_waitq);
   }
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
