@@ -10,6 +10,7 @@
 #include <limits.h>
 #include <semaphore.h>
 #include <poll.h>
+#include <sys/ioctl.h>
 
 #include "determ_clock.h"
 #include "perf_counter.h"
@@ -123,5 +124,8 @@ void determ_task_clock_is_lowest_wait(){
 //lock is held when we enter
 void determ_task_clock_remove(){
   perf_counter_stop(task_clock_info.perf_counter);
-  
+  if ( ioctl(pci->fd, PERF_EVENT_IOC_TASK_CLOCK_REMOVE, 0) != 0){
+    printf("\nreset wrong\n");
+    exit(EXIT_FAILURE);
+  }
 }
