@@ -20,7 +20,7 @@ int test1(int work){
 
 
 int main(){
-  int thread_count=3;
+  int thread_count=6;
   int * threads = malloc(sizeof(int)*thread_count);
   printf("first pid is %d\n", getpid());
 
