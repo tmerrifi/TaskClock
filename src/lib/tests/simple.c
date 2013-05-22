@@ -20,10 +20,11 @@ int test1(int work){
 
 
 int main(){
-  int threads=3;
+  int thread_count=3;
+  int * threads = malloc(sizeof(int)*thread_count);
   printf("first pid is %d\n", getpid());
 
-  for(int i=0;i<threads;++i){
+  for(int i=0;i<thread_count;++i){
     pid_t pid = fork();
     if (pid==0){
       determ_task_clock_init();
@@ -36,9 +37,15 @@ int main(){
       determ_task_clock_is_lowest_wait();
       determ_task_clock_halt();
     }
+    else{
+      threads[i]=pid;
+    }
   }
   
-  sleep(5);
+  int status;
+  for(int i=0;i<thread_count;++i){
+    waitpid(threads[i], &status, 0);
+  }
   //test1();
   //sleep(1);
   //test1();
