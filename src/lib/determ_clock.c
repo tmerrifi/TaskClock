@@ -12,10 +12,12 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <sched.h>
+#include <ftrace.h>
 
 #include "determ_clock.h"
 #include "perf_counter.h"
 #include "perf_event.h"
+
 
 struct determ_clock_info * clock_info;
 struct determ_task_clock_info task_clock_info;
@@ -29,7 +31,17 @@ struct determ_task_clock_info task_clock_info;
 
 //making a simple system call to let the kernel know where the tick array is located
 void __make_clock_sys_call(void * address, u_int64_t tid, u_int64_t fd){
+  if (tid==1){
+    struct ftracer * tracer = ftrace_init();
+    ftrace_on(tracer);
+    ftrace_write_to_trace(tracer, "\n\n\n\nSTARTING SYSCALL!!!!\n");
+  }
   syscall(__TASK_CLOCK_SYS_CALL, fd, (unsigned long)address, tid);
+  if (tid==1){
+    ftrace_write_to_trace(tracer, "\n\n\n\nENDING SYSCALL!!!!\n");
+    ftrace_off(tracer);
+    ftrace_close(tracer);
+  }
   printf("came back from the sys call %d cpu %d\n", getpid(), sched_getcpu());
 }
 
