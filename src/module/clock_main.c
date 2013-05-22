@@ -66,7 +66,7 @@ pte_t * pte_get_entry_from_address(struct mm_struct * mm, unsigned long addr){
 /*   int pending; */
 /* }; */
 
-#define __inc_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks)++
+#define __inc_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks++)
 
 #define __get_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks)
 
