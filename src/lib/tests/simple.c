@@ -28,12 +28,12 @@ int main(){
     pid_t pid = fork();
     if (pid==0){
       determ_task_clock_init();
-      test1((i+1)*10000);
+      test1((i+1)*100000);
       determ_task_clock_is_lowest_wait();
-      test1((i+1)*10000);
+      test1((i+1)*100000);
       determ_task_clock_is_lowest_wait();
       determ_task_clock_halt();
-      test1((i+1)*10000);
+      test1((i+1)*100000);
       determ_task_clock_is_lowest_wait();
       determ_task_clock_halt();
       exit(1);
