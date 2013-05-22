@@ -44,9 +44,10 @@ int main(){
   }
   
   int status;
-  for(int i=0;i<thread_count;++i){
+  sleep(2);
+  /*  for(int i=0;i<thread_count;++i){
     waitpid(threads[i], &status, 0);
-  }
+    }*/
   //test1();
   //sleep(1);
   //test1();
