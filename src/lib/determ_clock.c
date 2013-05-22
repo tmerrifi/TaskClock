@@ -87,6 +87,7 @@ __attribute__((constructor)) static void determ_clock_init(){
 void determ_task_clock_init(){
 
   task_clock_info.tid=__sync_fetch_and_add ( &(clock_info->id_counter), 1 );
+
   //printf("HERE 1 ??????? tid %d pid %d\n", task_clock_info.tid, getpid());
   if (task_clock_info.tid!=0){
     clock_info=__open_shared_mem();
@@ -96,11 +97,11 @@ void determ_task_clock_init(){
   //printf("HERE 2 ??????? tid %d pid %d cpu %d\n", task_clock_info.tid, getpid(), sched_getcpu());
   //set up the task clock for our process
   __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
-  sleep(5);
   //set up the performance counter
-
+  if (task_clock_info.tid!=1){
+    sleep(5);
+  }
   task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
-  printf("here %d\n", getpid());
 }
 
 
