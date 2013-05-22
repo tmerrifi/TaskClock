@@ -139,6 +139,7 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
 
   spin_lock_irqsave(&group_info->nmi_lock, flags);
   __inc_clock_ticks(group_info, current->task_clock.tid);
+  printk(KERN_EMERG "in overflow handler for %d and ticks is %llu\n", current->task_clock.tid, __get_clock_ticks(group_info, new_low));
   new_low=__new_lowest(group_info, current->task_clock.tid);
   if (new_low >= 0){
     printk(KERN_EMERG "new low %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
