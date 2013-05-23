@@ -238,6 +238,10 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
   //spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
+void task_clock_on_wait(struct task_clock_group_info * group_info){
+    group_info->clocks[current->task_clock.tid].waiting=1;
+}
+
 int init_module(void)
 {
   printk(KERN_EMERG "initializing module\n");
@@ -247,6 +251,7 @@ int init_module(void)
   task_clock_func.task_clock_entry_activate=task_clock_entry_activate;
   task_clock_func.task_clock_entry_halt=task_clock_entry_halt;
   task_clock_func.task_clock_on_disable=task_clock_on_disable;
+  task_clock_func.task_clock_on_wait=task_clock_on_wait;
 
   return 0;
 }
