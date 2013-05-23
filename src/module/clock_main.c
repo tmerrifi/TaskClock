@@ -97,6 +97,9 @@ int32_t __search_for_lowest(struct task_clock_group_info * group_info){
       min_tid=i;
     }
   }
+
+  printk(KERN_EMERG "min tid %d\n", min_tid);
+
   return min_tid;
 }
 
