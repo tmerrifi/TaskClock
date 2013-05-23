@@ -148,7 +148,7 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
     struct perf_event * event = group_info->clocks[group_info->lowest_tid].event;
     group_info->pending=0;
     //wake it up
-    printk(KERN_EMERG "waking up %d %p\n", group_info->lowest_tid, event);
+    printk(KERN_EMERG "%d is waking up %d\n", current->task_clock.tid, group_info->lowest_tid);
     __debug_print(group_info);
     __wake_up_waiting_thread(event);
   }
@@ -169,7 +169,6 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
     //there is a new lowest thread, make sure to set it
     group_info->lowest_tid=new_low;
     if (__new_low_is_waiting(group_info, new_low)){
-      printk(KERN_EMERG " SIGNALING NEW LOW!\n");
       group_info->pending=1;
       irq_work_queue(&group_info->pending_work);
     }
@@ -225,7 +224,7 @@ struct task_clock_group_info * task_clock_group_init(void){
 void task_clock_entry_halt(struct task_clock_group_info * group_info){
   unsigned long flags;
   int32_t new_low=-1;
-  printk(KERN_EMERG "HALTING %d\n", current->task_clock.tid);
+  //printk(KERN_EMERG "HALTING %d\n", current->task_clock.tid);
   //first, check if we're the lowest
   spin_lock_irqsave(&group_info->lock, flags);
   //make us inactive
@@ -236,10 +235,10 @@ void task_clock_entry_halt(struct task_clock_group_info * group_info){
     new_low=__new_lowest(group_info, current->task_clock.tid);
     //is there a new_low?
     group_info->lowest_tid=(new_low >= 0) ? new_low : -1;
-    printk(KERN_EMERG "----HALTING %d, setting new low to %d, new low waiting? %d\n", current->task_clock.tid, group_info->lowest_tid, (new_low>=0) ? __new_low_is_waiting(group_info, new_low) : 0);
+    //printk(KERN_EMERG "----HALTING %d, setting new low to %d, new low waiting? %d\n", current->task_clock.tid, group_info->lowest_tid, (new_low>=0) ? __new_low_is_waiting(group_info, new_low) : 0);
     if (new_low >= 0 && __new_low_is_waiting(group_info, new_low)){
       //lets wake it up
-      printk(KERN_EMERG "----HALTING SIGNALING NEW LOW!\n");
+      //printk(KERN_EMERG "----HALTING SIGNALING NEW LOW!\n");
       group_info->pending=1;
       irq_work_queue(&group_info->pending_work);
     }
