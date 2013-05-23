@@ -30,11 +30,11 @@ int main(){
       determ_task_clock_init();
       test1((i+1)*100000);
       printf("%d done with work\n", getpid());
-      /*determ_task_clock_is_lowest_wait();
+      determ_task_clock_is_lowest_wait();
       test1((i+1)*100000);
       determ_task_clock_is_lowest_wait();
       determ_task_clock_halt();
-      test1((i+1)*100000);
+      /*test1((i+1)*100000);
       determ_task_clock_is_lowest_wait();
       determ_task_clock_halt();*/
       exit(1);
