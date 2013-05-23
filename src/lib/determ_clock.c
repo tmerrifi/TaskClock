@@ -85,8 +85,9 @@ __attribute__((constructor)) static void determ_clock_init(){
   //TODO: this needs to be shared memory..
   char file_name[200];
   clock_info = __create_shared_mem(file_name);
-  //zero out the memory
   strcpy(clock_info->clock_file_name, file_name);
+  memset(clock_info->event_debugging, 0, DETERM_EVENT_DEBUGGING_SIZE * sizeof(u_int64_t));
+  clock_info->current_event_count=0;
   //initialize the first clock now
   determ_task_clock_init();
   clock_info->leader_perf_counter=task_clock_info.perf_counter;
@@ -137,8 +138,10 @@ void determ_task_clock_is_lowest_wait(){
     poll(fds, 1, -1);
     polled=1;
   }
-
-  printf("%d DONE WAITING!!!! polled %d\n", task_clock_info.tid, polled);
+  
+  u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
+  //ok, now set the debugging stuff
+  clock_info->event_debugging[count]=task_clock_info.tid;
   task_clock_info.user_status->lowest_clock=0;
   return;
 }
@@ -163,5 +166,12 @@ void determ_task_clock_halt(){
   if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){
     printf("\nHalt failed\n");
     exit(EXIT_FAILURE);
+  }
+}
+
+void determ_debugging_print_event(){
+  int i=0;
+  for (;i<clock_info->current_event_count;++i){
+    printf("%d: %llu\n", i, clock_info->event_debugging[i]);
   }
 }

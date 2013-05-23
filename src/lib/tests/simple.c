@@ -37,7 +37,6 @@ int main(){
       test1((i+1)*100000);
       wait_turn();
       determ_task_clock_halt();
-      printf("Thread %d done\n", i+1);
       exit(1);
     }
     else{
@@ -49,6 +48,8 @@ int main(){
   for(int i=0;i<thread_count;++i){
     waitpid(threads[i], &status, 0);
   }
+  
+  determ_debugging_print_event();
   //test1();
   //sleep(1);
   //test1();

@@ -11,6 +11,8 @@
 
 #define DETERM_CLOCK_MAX_THREADS 1024
 
+#define DETERM_EVENT_DEBUGGING_SIZE 100000
+
    //used by userspace to know what is going on                                                                         
    struct task_clock_user_status{
      u_int8_t lowest_clock; //set when you inactivate the clock                                                          
@@ -33,6 +35,8 @@
      struct perf_counter_info * leader_perf_counter;
      u_int64_t id_counter;
      char clock_file_name[200];
+     u_int64_t event_debugging[100000]; //up to these many events
+     u_int64_t current_event_count;
    };
 
 
@@ -52,6 +56,7 @@
    void determ_task_clock_stop();
    void determ_task_clock_halt();
    void determ_task_clock_activate();
+   void determ_debugging_print_event();
 
 #endif
 
