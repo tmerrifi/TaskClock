@@ -37,7 +37,7 @@ int main(){
       test1((i+1)*100000);
       wait_turn();
       determ_task_clock_halt();
-      printf("Thread %d done\n", i);
+      printf("Thread %d done\n", i+1);
       exit(1);
     }
     else{
