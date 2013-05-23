@@ -127,7 +127,7 @@ void __wake_up_waiting_thread(struct perf_event * event){
   rcu_read_lock();
   buffer = rcu_dereference(event->buffer);
   atomic_set(&buffer->poll, POLL_IN);
-  rc_read_unlock();
+  rcu_read_unlock();
   wake_up_all(&event->task_clock_waitq);
 }
 
