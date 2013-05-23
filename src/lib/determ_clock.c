@@ -129,8 +129,6 @@ u_int64_t determ_task_clock_read(){
 }
 
 void determ_task_clock_is_lowest_wait(){
-  //stop the counter
-  perf_counter_stop(task_clock_info.perf_counter);
   //are we the lowest? If we are, no reason to wait around
   if (!task_clock_info.user_status->lowest_clock){
     //poll on the fd of the perf_event
@@ -157,7 +155,10 @@ void determ_task_clock_start(){
   perf_counter_start(task_clock_info.perf_counter);
 }
 
-//lock is held when we enter
+void determ_task_clock_stop(){
+  perf_counter_stop(task_clock_info.perf_counter);
+}
+
 void determ_task_clock_halt(){
   perf_counter_stop(task_clock_info.perf_counter);
   if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){

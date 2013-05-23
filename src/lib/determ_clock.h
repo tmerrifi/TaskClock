@@ -49,6 +49,7 @@
    u_int64_t determ_task_clock_read();
    u_int8_t determ_task_clock_is_lowest();
    void determ_task_clock_start();
+   void determ_task_clock_stop();
    void determ_task_clock_halt();
    void determ_task_clock_activate();
 

@@ -17,6 +17,11 @@ int test1(int work){
   do_work(work);
 }
 
+void wait_turn(){
+  determ_task_clock_stop();
+  determ_task_clock_is_lowest_wait();
+  determ_task_clock_start();
+}
 
 int main(){
   int thread_count=6;
@@ -28,9 +33,9 @@ int main(){
     if (pid==0){
       determ_task_clock_init();
       test1((i+1)*100000);
-      determ_task_clock_is_lowest_wait();
+      wait_turn();
       test1((i+1)*100000);
-      determ_task_clock_is_lowest_wait();
+      wait_turn();
       determ_task_clock_halt();
       printf("Thread %d done\n", i);
       exit(1);
