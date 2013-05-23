@@ -85,12 +85,12 @@ int __is_lowest(struct task_clock_group_info * group_info, int32_t tid){
 int32_t __search_for_lowest(struct task_clock_group_info * group_info){
   int i=0;
   int32_t min_tid=-1;
-  printk(KERN_EMERG "\n\nSEARCH FOR LOWEST....\n");
+  printk(KERN_EMERG "\n\nSEARCH FOR LOWEST....%d\n", current->task_clock.tid);
   for (;i<TASK_CLOCK_MAX_THREADS;++i){
     struct task_clock_entry_info * entry = &group_info->clocks[i];
     //debugging
     if (i<7){
-      printk(KERN_EMERG " tid: %d ticks %d inactive %d::");
+      printk(KERN_EMERG " tid: %d ticks %d inactive %d::", i, __get_clock_ticks(group_info, i), entry->inactive);
     }
 
     if (entry->fd >= 0 && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
