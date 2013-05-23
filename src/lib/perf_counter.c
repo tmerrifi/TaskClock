@@ -53,7 +53,6 @@ struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t gr
 
   void * ring_buffer;
 
-  printf("fd is %d\n", fd);
   //16MB ring buffer
   if ((ring_buffer = mmap(NULL, PAGE_SIZE + (PAGE_SIZE * 1024) , PROT_READ | PROT_WRITE,
 			  MAP_SHARED, fd, 0)) == MAP_FAILED) {
