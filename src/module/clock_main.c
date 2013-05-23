@@ -218,7 +218,7 @@ void task_clock_entry_halt(struct task_clock_group_info * group_info){
     new_low=__new_lowest(group_info, current->task_clock.tid);
     //is there a new_low?
     group_info->lowest_tid=(new_low >= 0) ? new_low : -1;
-    printk(KERN_EMERG "----HALTING %d, setting new low to %d\n", current->task_clock.tid, group_info->lowest_tid);
+    printk(KERN_EMERG "----HALTING %d, setting new low to %d, new low waiting? %d\n", current->task_clock.tid, group_info->lowest_tid, (new_low>=0) ? __new_low_is_waiting(group_info, new_low) : 0);
     if (new_low >= 0 && __new_low_is_waiting(group_info, new_low)){
       //lets wake it up
       printk(KERN_EMERG "----HALTING SIGNALING NEW LOW!\n");
