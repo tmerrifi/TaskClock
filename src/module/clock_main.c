@@ -90,9 +90,8 @@ int32_t __search_for_lowest(struct task_clock_group_info * group_info){
     struct task_clock_entry_info * entry = &group_info->clocks[i];
     //debugging
     if (i<7){
-      printk(KERN_EMERG " tid: %d ticks %d inactive %d::", i, __get_clock_ticks(group_info, i), entry->inactive);
+      printk(KERN_EMERG " tid: %d ticks %d inactive %d fd %d::", i, __get_clock_ticks(group_info, i), entry->inactive, entry->fd);
     }
-
     if (entry->fd >= 0 && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
       min_tid=i;
     }
