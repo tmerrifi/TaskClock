@@ -122,6 +122,14 @@ int32_t __new_low_is_waiting(struct task_clock_group_info * group_info, int32_t 
   return (tid >= 0 && group_info->clocks[tid].waiting);
 }
 
+void __wake_up_waiting_thread(struct perf_event * event){
+  rcu_read_lock();
+  buffer = rcu_dereference(event->buffer);
+  atomic_set(&handle->buffer->poll, POLL_IN);
+  rc_read_unlock();
+  wake_up_all(&event->task_clock_waitq);
+}
+
 void __task_clock_notify_waiting_threads(struct irq_work * work){
   unsigned long flags;
   struct task_clock_group_info * group_info = container_of(work, struct task_clock_group_info, pending_work);
@@ -132,7 +140,7 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
     group_info->pending=0;
     //wake it up
     printk(KERN_EMERG "waking up %d %p\n", group_info->lowest_tid, event);
-    wake_up_all(&event->task_clock_waitq);
+    __wake_up_waiting_thread(event);
   }
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
