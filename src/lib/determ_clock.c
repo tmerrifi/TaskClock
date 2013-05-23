@@ -139,7 +139,7 @@ void determ_task_clock_is_lowest_wait(){
     fds->fd = task_clock_info.perf_counter->fd;
     fds->events = POLLIN;
     poll(fds, 1, -1);
-    printf("WOKE UP!!!!\n");
+    printf("%d WOKE UP!!!!\n", task_clock_info.tid);
   }
 
   task_clock_info.user_status->lowest_clock=0;

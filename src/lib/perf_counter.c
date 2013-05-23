@@ -86,7 +86,6 @@ void perf_counter_start(struct perf_counter_info * pci){
 }
 
 void perf_counter_stop(struct perf_counter_info * pci){
-  printf("perf_counter_stop %d\n", getpid());
   if ( ioctl(pci->fd, PERF_EVENT_IOC_DISABLE, 0) != 0){
     printf("\ndisable wrong\n");
     exit(EXIT_FAILURE);
