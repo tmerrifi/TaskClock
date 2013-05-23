@@ -127,6 +127,7 @@ u_int64_t determ_task_clock_read(){
 
 void determ_task_clock_is_lowest_wait(){
   //are we the lowest? If we are, no reason to wait around
+  int polled=0;
   if (!task_clock_info.user_status->lowest_clock){
     //poll on the fd of the perf_event
     struct pollfd * fds = malloc(sizeof(struct pollfd));
@@ -134,10 +135,10 @@ void determ_task_clock_is_lowest_wait(){
     fds->fd = task_clock_info.perf_counter->fd;
     fds->events = POLLIN;
     poll(fds, 1, -1);
-
+    polled=1;
   }
 
-  printf("%d DONE WAITING!!!!\n", task_clock_info.tid);
+  printf("%d DONE WAITING!!!! polled %d\n", task_clock_info.tid, polled);
   task_clock_info.user_status->lowest_clock=0;
   return;
 }
