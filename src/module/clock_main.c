@@ -178,7 +178,7 @@ void __init_task_clock_entries(struct task_clock_group_info * group_info){
   int i=0;
   for (;i<TASK_CLOCK_MAX_THREADS;++i){
     struct task_clock_entry_info * entry = &group_info->clocks[i];
-    entry->fd=-1;
+    entry->initialized=-1;
     entry->waiting=0;
     entry->inactive=0;
     entry->ticks=(1ULL<<63);
@@ -187,7 +187,7 @@ void __init_task_clock_entries(struct task_clock_group_info * group_info){
 
 void task_clock_entry_init(struct task_clock_group_info * group_info, struct perf_event * event){
   //store the event pointer to use later
-
+  group_info->clocks[current->task_clock.tid].initialized=1;
   group_info->clocks[current->task_clock.tid].event=event;
   group_info->clocks[current->task_clock.tid].ticks=0;
   printk(KERN_EMERG "event is %p....ticks are %llu \n", event, __get_clock_ticks(group_info, current->task_clock.tid));
