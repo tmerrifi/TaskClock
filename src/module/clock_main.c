@@ -85,8 +85,14 @@ int __is_lowest(struct task_clock_group_info * group_info, int32_t tid){
 int32_t __search_for_lowest(struct task_clock_group_info * group_info){
   int i=0;
   int32_t min_tid=-1;
+  printk(KERN_EMERG "\n\nSEARCH FOR LOWEST....\n");
   for (;i<TASK_CLOCK_MAX_THREADS;++i){
     struct task_clock_entry_info * entry = &group_info->clocks[i];
+    //debugging
+    if (i<7){
+      printk(KERN_EMERG " tid: %d ticks %d inactive %d::");
+    }
+
     if (entry->fd >= 0 && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
       min_tid=i;
     }
@@ -158,9 +164,9 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
   unsigned long flags;
   spin_lock_irqsave(&group_info->lock, flags);
   //am I the lowest?
-  printk(KERN_EMERG "On Disable...%d\n", current->task_clock.tid);
+  printk(KERN_EMERG "Disabling...%d\n", current->task_clock.tid);
   if(group_info->lowest_tid == current->task_clock.tid){
-    printk(KERN_EMERG "On Disable...%d is lowest with %llu ticks\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
+    printk(KERN_EMERG "in disable...%d is lowest with %llu ticks\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
     current->task_clock.user_status->lowest_clock=1;
   }
   spin_unlock_irqrestore(&group_info->lock, flags);
