@@ -100,6 +100,16 @@ int32_t __search_for_lowest(struct task_clock_group_info * group_info){
   return min_tid;
 }
 
+void __debug_print(struct task_clock_group_info * group_info){
+  int i=0;
+  printk(KERN_EMERG "\n\nSEARCH FOR LOWEST....%d\n", current->task_clock.tid);
+  for (;i<7;++i){
+    struct task_clock_entry_info * entry = &group_info->clocks[i];
+    //debugging
+    printk(KERN_EMERG " tid: %d ticks %d inactive %d init %d::", i, __get_clock_ticks(group_info, i), entry->inactive, entry->initialized);
+  }
+}
+
 int32_t __new_lowest(struct task_clock_group_info * group_info, int32_t tid){
   int32_t new_low=-1;
   int32_t tmp;
@@ -139,6 +149,7 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
     group_info->pending=0;
     //wake it up
     printk(KERN_EMERG "waking up %d %p\n", group_info->lowest_tid, event);
+    __debug_print(group_info);
     __wake_up_waiting_thread(event);
   }
   spin_unlock_irqrestore(&group_info->lock, flags);
