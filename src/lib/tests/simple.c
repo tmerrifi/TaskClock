@@ -32,6 +32,7 @@ int main(){
       test1((i+1)*100000);
       determ_task_clock_is_lowest_wait();
       determ_task_clock_halt();
+      printf("Thread %d done\n", i);
       exit(1);
     }
     else{
