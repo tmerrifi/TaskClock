@@ -123,9 +123,10 @@ int32_t __new_low_is_waiting(struct task_clock_group_info * group_info, int32_t 
 }
 
 void __wake_up_waiting_thread(struct perf_event * event){
+  struct perf_buffer * buffer;
   rcu_read_lock();
   buffer = rcu_dereference(event->buffer);
-  atomic_set(&handle->buffer->poll, POLL_IN);
+  atomic_set(&buffer->poll, POLL_IN);
   rc_read_unlock();
   wake_up_all(&event->task_clock_waitq);
 }
