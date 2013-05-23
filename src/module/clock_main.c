@@ -148,8 +148,8 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
     struct perf_event * event = group_info->clocks[group_info->lowest_tid].event;
     group_info->pending=0;
     //wake it up
-    printk(KERN_EMERG "%d is waking up %d\n", current->task_clock.tid, group_info->lowest_tid);
-    __debug_print(group_info);
+    //printk(KERN_EMERG "%d is waking up %d\n", current->task_clock.tid, group_info->lowest_tid);
+    //__debug_print(group_info);
     __wake_up_waiting_thread(event);
   }
   spin_unlock_irqrestore(&group_info->lock, flags);
@@ -165,7 +165,7 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   //printk(KERN_EMERG "in overflow handler 2 for %d and ticks is %llu\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
   new_low=__new_lowest(group_info, current->task_clock.tid);
   if (new_low >= 0){
-    printk(KERN_EMERG "new low %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
+    //printk(KERN_EMERG "new low %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
     //there is a new lowest thread, make sure to set it
     group_info->lowest_tid=new_low;
     if (__new_low_is_waiting(group_info, new_low)){
@@ -183,9 +183,9 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
   unsigned long flags;
   spin_lock_irqsave(&group_info->lock, flags);
   //am I the lowest?
-  printk(KERN_EMERG "Disabling...%d\n", current->task_clock.tid);
+  printk(KERN_EMERG "Disabling...%d ticks %llu\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
   if(group_info->lowest_tid == current->task_clock.tid){
-    printk(KERN_EMERG "in disable...%d is lowest with %llu ticks\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
+    //printk(KERN_EMERG "in disable...%d is lowest with %llu ticks\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
     current->task_clock.user_status->lowest_clock=1;
   }
   spin_unlock_irqrestore(&group_info->lock, flags);
@@ -207,7 +207,7 @@ void task_clock_entry_init(struct task_clock_group_info * group_info, struct per
   group_info->clocks[current->task_clock.tid].initialized=1;
   group_info->clocks[current->task_clock.tid].event=event;
   group_info->clocks[current->task_clock.tid].ticks=0;
-  printk(KERN_EMERG "INIT, tid %d event is %p....ticks are %llu \n", current->task_clock.tid, event, __get_clock_ticks(group_info, current->task_clock.tid));
+  //printk(KERN_EMERG "INIT, tid %d event is %p....ticks are %llu \n", current->task_clock.tid, event, __get_clock_ticks(group_info, current->task_clock.tid));
 }
 
 struct task_clock_group_info * task_clock_group_init(void){
