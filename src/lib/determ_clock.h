@@ -57,6 +57,7 @@
    void determ_task_clock_halt();
    void determ_task_clock_activate();
    void determ_debugging_print_event();
+   u_int32_t determ_task_get_id();
 
 #endif
 

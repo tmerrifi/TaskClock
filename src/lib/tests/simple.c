@@ -27,14 +27,14 @@ int main(){
   int thread_count=6;
   int * threads = malloc(sizeof(int)*thread_count);
   determ_task_clock_halt();
-
+  
   for(int i=0;i<thread_count;++i){
     pid_t pid = fork();
     if (pid==0){
       determ_task_clock_init();
-      test1((i+1)*100000);
+      test1((determ_task_get_id()+1)*100000);
       wait_turn();
-      test1((i+1)*100000);
+      test1((determ_task_get_id()+1)*100000);
       wait_turn();
       determ_task_clock_halt();
       exit(1);

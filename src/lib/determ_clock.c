@@ -169,6 +169,10 @@ void determ_task_clock_halt(){
   }
 }
 
+u_int32_t determ_task_get_id(){
+  return task_clock_info.tid;
+}
+
 void determ_debugging_print_event(){
   int i=0;
   for (;i<clock_info->current_event_count;++i){
