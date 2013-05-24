@@ -19,7 +19,7 @@ int test1(int work){
 
 void wait_turn(){
   //determ_task_clock_stop();
-  //determ_task_clock_is_lowest_wait();
+  determ_task_clock_is_lowest_wait();
   //determ_task_clock_start();
 }
 
