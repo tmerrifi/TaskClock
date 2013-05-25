@@ -15,18 +15,15 @@
 
    //used by userspace to know what is going on                                                                         
    struct task_clock_user_status{
-     u_int8_t lowest_clock; //set when you inactivate the clock                                                          
-   };
+     u_int8_t lowest_clock; //set when you inactivate the clock      
+     u_int64_t ticks;
+   };__attribute__ ((aligned (8), packed));
 
    struct determ_task_clock_info{
      u_int32_t tid;
      struct perf_counter_info * perf_counter;
      struct task_clock_user_status * user_status;
    };
-
-   struct determ_task_clock{
-     volatile u_int64_t ticks;
-   } __attribute__ ((aligned (8)));
 
    struct determ_clock_info{
      /*volatile u_int64_t low_ticks;

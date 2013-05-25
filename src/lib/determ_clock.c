@@ -123,7 +123,7 @@ void determ_task_clock_init(){
 
 u_int64_t determ_task_clock_read(){
   perf_counter_stop(task_clock_info.perf_counter);
-  return 0;
+  return task_clock_info.user_status->ticks;
 }
 
 void determ_task_clock_is_lowest_wait(){
@@ -143,6 +143,7 @@ void determ_task_clock_is_lowest_wait(){
   //ok, now set the debugging stuff
   clock_info->event_debugging[count]=task_clock_info.tid;
   task_clock_info.user_status->lowest_clock=0;
+
   return;
 }
 
