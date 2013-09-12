@@ -27,6 +27,7 @@ void wait_turn(){
 int main(){
   int thread_count=6;
   int * threads = malloc(sizeof(int)*thread_count);
+  //TODO: why do we call halt here? The clock should not have started yet
   determ_task_clock_halt();
   
   for(int i=0;i<thread_count;++i){

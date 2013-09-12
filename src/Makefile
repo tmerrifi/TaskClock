@@ -1,7 +1,7 @@
 
 .PHONY : module
 SHELL = /bin/bash
-CFLAGS = -g -std=c99 -fPIC
+CFLAGS = -g -std=c99 -fPIC -L/usr/lib
 SOURCES = ./lib/perf_counter.o ./lib/determ_clock.o
 TESTS = clock_tests
 LIBS = -lrt -lksnap

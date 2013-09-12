@@ -72,41 +72,36 @@ void * __open_shared_mem(){
 }
 
 __attribute__((constructor)) static void determ_clock_init(){
-  //TODO: this needs to be shared memory..
-  char file_name[200];
-  clock_info = __create_shared_mem(file_name);
-  strcpy(clock_info->clock_file_name, file_name);
-  memset(clock_info->event_debugging, 0, DETERM_EVENT_DEBUGGING_SIZE * sizeof(u_int64_t));
-  clock_info->current_event_count=0;
-  //initialize the first clock now
-  determ_task_clock_init();
-  clock_info->leader_perf_counter=task_clock_info.perf_counter;
+    char file_name[200];
+    //creating a chunk of shared memory
+    clock_info = __create_shared_mem(file_name);
+    //copy the filename that was created in __create_shared_mem
+    strcpy(clock_info->clock_file_name, file_name);
+    memset(clock_info->event_debugging, 0, DETERM_EVENT_DEBUGGING_SIZE * sizeof(u_int64_t));
+    clock_info->current_event_count=0;
+    //initialize the first clock now
+    determ_task_clock_init();
+    clock_info->leader_perf_counter=task_clock_info.perf_counter;
 }
 
 //initialize the clock structure and call the perf object to actually set up the
 //instruction counting
 void determ_task_clock_init(){
-
-  task_clock_info.tid=__sync_fetch_and_add ( &(clock_info->id_counter), 1 );
-
-  //printf("HERE 1 ??????? tid %d pid %d\n", task_clock_info.tid, getpid());
-  if (task_clock_info.tid!=0){
-    clock_info=__open_shared_mem();
-  }
-  task_clock_info.user_status = malloc(sizeof(struct task_clock_user_status));
-  memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
-  //printf("HERE 2 ??????? tid %d pid %d cpu %d\n", task_clock_info.tid, getpid(), sched_getcpu());
-  //set up the task clock for our process
-  __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
-  //set up the performance counter
-  /*if (task_clock_info.tid>1){
-    sleep(50);
-  }
-  else{
-    printf("im %d\n", getpid());
-    }*/
-
-  task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
+    //atomically increment and set the id
+    task_clock_info.tid=__sync_fetch_and_add(&(clock_info->id_counter), 1 );
+    //if we're not the first process, we open the memory mapping...the question is why? Since we forked
+    //it should already be open. TODO: figure out whether to assume this mapping is already in our
+    //address space, or make sure it isn't with madvise
+    if (task_clock_info.tid!=0){
+        clock_info=__open_shared_mem();
+    }
+    //allocating the user status which is looked at by the kernel
+    task_clock_info.user_status = malloc(sizeof(struct task_clock_user_status));
+    memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
+    //set up the task clock for our process
+    __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
+    //set up the performance counter
+    task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
 }
 
 
@@ -116,25 +111,27 @@ u_int64_t determ_task_clock_read(){
   return task_clock_info.user_status->ticks;
 }
 
+//we arrive here if we're the lowest clock, else we need to poll and wait
 void determ_task_clock_is_lowest_wait(){
-  //are we the lowest? If we are, no reason to wait around
-  int polled=0;
-  if (!task_clock_info.user_status->lowest_clock){
-    //poll on the fd of the perf_event
-    struct pollfd * fds = malloc(sizeof(struct pollfd));
-    memset(fds, 0, sizeof(struct pollfd));
-    fds->fd = task_clock_info.perf_counter->fd;
-    fds->events = POLLIN;
-    poll(fds, 1, -1);
-    polled=1;
-  }
-  
-  u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
-  //ok, now set the debugging stuff
-  clock_info->event_debugging[count]=task_clock_info.tid;
-  task_clock_info.user_status->lowest_clock=0;
-
-  return;
+    //are we the lowest? If we are, no reason to wait around
+    int polled=0;
+    if (!task_clock_info.user_status->lowest_clock){
+        printf("thread %d polling\n", task_clock_info.tid);
+        //poll on the fd of the perf_event
+        struct pollfd * fds = malloc(sizeof(struct pollfd));
+        memset(fds, 0, sizeof(struct pollfd));
+        fds->fd = task_clock_info.perf_counter->fd;
+        fds->events = POLLIN;
+        poll(fds, 1, -1);
+        polled=1;
+    }
+    else{
+        printf("thread %d never polled, just kept going\n", task_clock_info.tid);
+    }
+    u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
+    //ok, now set the debugging stuff
+    clock_info->event_debugging[count]=task_clock_info.tid;
+    return;
 }
 
 void determ_task_clock_activate(){
@@ -145,19 +142,20 @@ void determ_task_clock_activate(){
 }
 
 void determ_task_clock_start(){
-  perf_counter_start(task_clock_info.perf_counter);
+    task_clock_info.user_status->lowest_clock=0;
+    perf_counter_start(task_clock_info.perf_counter);
 }
 
 void determ_task_clock_stop(){
-  perf_counter_stop(task_clock_info.perf_counter);
+    perf_counter_stop(task_clock_info.perf_counter);
 }
 
 void determ_task_clock_halt(){
-  perf_counter_stop(task_clock_info.perf_counter);
-  if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){
-    printf("\nHalt failed\n");
-    exit(EXIT_FAILURE);
-  }
+    perf_counter_stop(task_clock_info.perf_counter);
+    if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){
+        printf("\nHalt failed\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 u_int32_t determ_task_get_id(){
