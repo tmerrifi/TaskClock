@@ -1,7 +1,7 @@
 
 .PHONY : module
 SHELL = /bin/bash
-CFLAGS = -g -std=c99 -fPIC -L/usr/lib
+CFLAGS = -g -std=c99 -fPIC -L/usr/lib -m32
 SOURCES = ./lib/perf_counter.o ./lib/determ_clock.o
 TESTS = clock_tests
 LIBS = -lrt -lksnap
@@ -9,8 +9,8 @@ LIBS = -lrt -lksnap
 all : dynlib module
 
 dynlib: $(SOURCES) 
-	gcc -shared $(CFLAGS) -o libHiDet.so $(SOURCES) $(LIBS); \
-	sudo cp libHiDet.so /usr/lib;
+	gcc -shared $(CFLAGS) -o libDetermTaskClock.so $(SOURCES) $(LIBS); \
+	sudo cp libDetermTaskClock.so /usr/lib;
 
 %.o : %.c
 	gcc $(CFLAGS) -o $@ -c $< $(LIBS);

@@ -1,12 +1,12 @@
 
 SHELL = /bin/bash
 SOURCES = simple
-FLAGS = -g -std=c99 -lHiDet -lksnap
+FLAGS = -g -std=gnu99 -lDetermTaskClock -lksnap -m32
 
 all : $(SOURCES)
 
 % : %.c
-	gcc -std=c99 -o $@ $< $(FLAGS)
+	gcc -o $@ $< $(FLAGS)
 
 clean : 
 	rm $(SOURCES);
