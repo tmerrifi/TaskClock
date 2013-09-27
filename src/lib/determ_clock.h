@@ -15,7 +15,7 @@
 
    //used by userspace to know what is going on                                                                         
    struct task_clock_user_status{
-     u_int8_t lowest_clock; //set when you inactivate the clock      
+     u_int64_t lowest_clock; //set when you inactivate the clock      
      u_int64_t ticks;
    };__attribute__ ((aligned (8), packed));
 

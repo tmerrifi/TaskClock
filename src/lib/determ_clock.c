@@ -30,8 +30,9 @@ struct determ_task_clock_info task_clock_info;
 #endif
 
 //making a simple system call to let the kernel know where the tick array is located
-void __make_clock_sys_call(void * address, u_int64_t tid, u_int64_t fd){
+void __make_clock_sys_call(void * address, size_t tid, size_t fd){
   struct ftracer * tracer;
+  //printf("the address of the user data %p pid %d tid %d\n", address, getpid(), tid);
   syscall(__TASK_CLOCK_SYS_CALL, fd, (unsigned long)address, tid);
 }
 
@@ -107,8 +108,9 @@ void determ_task_clock_init(){
 
 
 u_int64_t determ_task_clock_read(){
-  perf_counter_stop(task_clock_info.perf_counter);
-  return task_clock_info.user_status->ticks;
+    //perf_counter_stop(task_clock_info.perf_counter);
+    //printf("process %d reading ticks at %p\n", getpid(), &task_clock_info.user_status->ticks);
+    return task_clock_info.user_status->ticks;
 }
 
 //we arrive here if we're the lowest clock, else we need to poll and wait
@@ -146,10 +148,12 @@ void determ_task_clock_start(){
     perf_counter_start(task_clock_info.perf_counter);
 }
 
+//No longer counting, but still can be named "lowest" clock
 void determ_task_clock_stop(){
     perf_counter_stop(task_clock_info.perf_counter);
 }
 
+//Calling halt means that we are no longer considered as "part of the group." We can't have the lowest clock.
 void determ_task_clock_halt(){
     perf_counter_stop(task_clock_info.perf_counter);
     if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){
