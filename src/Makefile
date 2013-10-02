@@ -10,7 +10,9 @@ all : dynlib module
 
 dynlib: $(SOURCES) 
 	gcc -shared $(CFLAGS) -o libDetermTaskClock.so $(SOURCES) $(LIBS); \
-	sudo cp libDetermTaskClock.so /usr/lib;
+	sudo cp libDetermTaskClock.so /usr/lib; \
+	sudo cp lib/*.h /usr/include;
+
 
 %.o : %.c
 	gcc $(CFLAGS) -o $@ -c $< $(LIBS);

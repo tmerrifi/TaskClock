@@ -13,7 +13,7 @@
 #include <poll.h>
 #include <errno.h>
 
-#include "perf_event.h"
+#include "determ_perf_event.h"
 #include "perf_counter.h"
 
 
@@ -27,7 +27,7 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
     return ret;
 }
 
-struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t group_fd){
+void perf_counter_init(u_int32_t sample_period, int32_t group_fd, struct perf_counter_info * pci){
 
   struct perf_event_attr pe;
   int fd;
@@ -36,15 +36,17 @@ struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t gr
   //clear the perf_event_attr struct                                                                                   
   memset(&pe, 0, sizeof(struct perf_event_attr));
   pe.type = PERF_TYPE_HARDWARE;
+  //pe.type = PERF_TYPE_RAW;
   pe.size = sizeof(struct perf_event_attr);
   pe.config = PERF_COUNT_HW_INSTRUCTIONS;
+  //pe.config = (0x0BULL) | (0x0200ULL);
   pe.disabled = 1;
   pe.exclude_kernel = 1;
   pe.exclude_hv = 1;
   pe.sample_period = sample_period;
   //this is our custom special flag!
   pe.task_clock = 1;
-
+  
   fd = perf_event_open(&pe, 0, -1, group_fd, 0);
   if (fd == -1) {
     fprintf(stderr, "Error opening leader %llx\n", pe.config);
@@ -56,19 +58,18 @@ struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t gr
   //16MB ring buffer
   if ((ring_buffer = mmap(NULL, PAGE_SIZE + (PAGE_SIZE * 1024) , PROT_READ | PROT_WRITE,
 			  MAP_SHARED, fd, 0)) == MAP_FAILED) {
-    printf("\nFAILED! %d fd %d %d\n", getpid(), fd, errno);
-    perror("FAILED");
-    close(fd);
-    exit(EXIT_FAILURE);
+      
+      fprintf(stderr, "\nFAILED! %d fd %d %d\n", getpid(), fd, errno);
+      perror("FAILED");
+      close(fd);
+      exit(EXIT_FAILURE);
   }  
 
   //setup the info object
-  struct perf_counter_info * pci = malloc(sizeof(struct perf_counter_info));
   pci->pid=getpid();
   pci->fd=fd;
   pci->ring_buffer_current=ring_buffer+PAGE_SIZE;
   pci->ring_buffer=ring_buffer;
-  return pci;
 }
 
 void perf_counter_start(struct perf_counter_info * pci){

@@ -16,7 +16,7 @@
 
 #include "determ_clock.h"
 #include "perf_counter.h"
-#include "perf_event.h"
+#include "determ_perf_event.h"
 
 
 struct determ_clock_info * clock_info;
@@ -28,6 +28,10 @@ struct determ_task_clock_info task_clock_info;
 #else
 #define __TASK_CLOCK_SYS_CALL 342
 #endif
+
+struct determ_task_clock_info determ_task_clock_get_info(){
+    return task_clock_info;
+}
 
 //making a simple system call to let the kernel know where the tick array is located
 void __make_clock_sys_call(void * address, size_t tid, size_t fd){
@@ -79,10 +83,11 @@ __attribute__((constructor)) static void determ_clock_init(){
     //copy the filename that was created in __create_shared_mem
     strcpy(clock_info->clock_file_name, file_name);
     memset(clock_info->event_debugging, 0, DETERM_EVENT_DEBUGGING_SIZE * sizeof(u_int64_t));
+    memset(clock_info->event_tick_debugging, 0, DETERM_EVENT_DEBUGGING_SIZE * sizeof(u_int64_t));
     clock_info->current_event_count=0;
     //initialize the first clock now
     determ_task_clock_init();
-    clock_info->leader_perf_counter=task_clock_info.perf_counter;
+    clock_info->leader_perf_counter=&task_clock_info.perf_counter;
 }
 
 //initialize the clock structure and call the perf object to actually set up the
@@ -97,12 +102,12 @@ void determ_task_clock_init(){
         clock_info=__open_shared_mem();
     }
     //allocating the user status which is looked at by the kernel
-    task_clock_info.user_status = malloc(sizeof(struct task_clock_user_status));
+    task_clock_info.user_status = &clock_info->user_status[task_clock_info.tid]; //malloc(sizeof(struct task_clock_user_status));
     memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
     //set up the task clock for our process
     __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
     //set up the performance counter
-    task_clock_info.perf_counter = perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter->fd );
+    perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter.fd, &task_clock_info.perf_counter);
 }
 
 
@@ -118,26 +123,23 @@ void determ_task_clock_is_lowest_wait(){
     //are we the lowest? If we are, no reason to wait around
     int polled=0;
     if (!task_clock_info.user_status->lowest_clock){
-        printf("thread %d polling\n", task_clock_info.tid);
         //poll on the fd of the perf_event
-        struct pollfd * fds = malloc(sizeof(struct pollfd));
-        memset(fds, 0, sizeof(struct pollfd));
-        fds->fd = task_clock_info.perf_counter->fd;
-        fds->events = POLLIN;
-        poll(fds, 1, -1);
+        struct pollfd fds;
+        memset(&fds, 0, sizeof(struct pollfd));
+        fds.fd = task_clock_info.perf_counter.fd;
+        fds.events = POLLIN;
+        poll(&fds, 1, -1);
         polled=1;
-    }
-    else{
-        printf("thread %d never polled, just kept going\n", task_clock_info.tid);
     }
     u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
     //ok, now set the debugging stuff
     clock_info->event_debugging[count]=task_clock_info.tid;
+    clock_info->event_tick_debugging[count]=task_clock_info.user_status->ticks;
     return;
 }
 
 void determ_task_clock_activate(){
-  if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE, 0) != 0){
+  if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE, 0) != 0){
     printf("\nClock start failed\n");
     exit(EXIT_FAILURE);
   }
@@ -145,18 +147,18 @@ void determ_task_clock_activate(){
 
 void determ_task_clock_start(){
     task_clock_info.user_status->lowest_clock=0;
-    perf_counter_start(task_clock_info.perf_counter);
+    perf_counter_start(&task_clock_info.perf_counter);
 }
 
 //No longer counting, but still can be named "lowest" clock
 void determ_task_clock_stop(){
-    perf_counter_stop(task_clock_info.perf_counter);
+    perf_counter_stop(&task_clock_info.perf_counter);
 }
 
 //Calling halt means that we are no longer considered as "part of the group." We can't have the lowest clock.
 void determ_task_clock_halt(){
-    perf_counter_stop(task_clock_info.perf_counter);
-    if ( ioctl(task_clock_info.perf_counter->fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){
+    perf_counter_stop(&task_clock_info.perf_counter);
+    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){
         printf("\nHalt failed\n");
         exit(EXIT_FAILURE);
     }
@@ -169,6 +171,6 @@ u_int32_t determ_task_get_id(){
 void determ_debugging_print_event(){
   int i=0;
   for (;i<clock_info->current_event_count;++i){
-    printf("%d: %llu\n", i, clock_info->event_debugging[i]);
+      printf("%d: %llu %llu\n", i, clock_info->event_debugging[i], clock_info->event_tick_debugging[i]);
   }
 }

@@ -7,7 +7,7 @@
 #ifndef PERF_COUNTER_H
 #define PERF_COUNTER_H
 
-#include "perf_event.h"
+#include <determ_perf_event.h>
 #include <sys/types.h>
 
    #define PAGE_SIZE 4096
@@ -31,10 +31,10 @@
    
 
 
-   struct perf_counter_info * perf_counter_init(u_int32_t sample_period, int32_t group_fd);
-   void perf_counter_start(struct perf_counter_info * pci);
-   void perf_counter_stop(struct perf_counter_info * pci);
-   u_int64_t perf_counter_read(struct perf_counter_info * pci);
+     void perf_counter_init(u_int32_t sample_period, int32_t group_fd, struct perf_counter_info * pci);
+     void perf_counter_start(struct perf_counter_info * pci);
+     void perf_counter_stop(struct perf_counter_info * pci);
+     u_int64_t perf_counter_read(struct perf_counter_info * pci);
 
 #endif
 
