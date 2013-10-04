@@ -19,40 +19,53 @@ int test1(int work){
 
 void wait_turn(){
   determ_task_clock_stop();
+  //printf("%d start waiting %d \n", determ_task_get_id(), determ_task_clock_read());
   determ_task_clock_is_lowest_wait();
-  printf("%d done waiting %d \n", determ_task_get_id(), determ_task_clock_read());
+  //printf("%d done waiting %d \n", determ_task_get_id(), determ_task_clock_read());
   determ_task_clock_start();
 }
 
 int main(){
-  int thread_count=6;
-  int * threads = malloc(sizeof(int)*thread_count);
-  //TODO: why do we call halt here? The clock should not have started yet
-  determ_task_clock_halt();
-  
-  for(int i=0;i<thread_count;++i){
-    pid_t pid = fork();
-    if (pid==0){
-      determ_task_clock_init();
-      test1((determ_task_get_id()+1)*100000);
-      wait_turn();
-      test1((determ_task_get_id()+1)*100000);
-      wait_turn();
-      determ_task_clock_halt();
-      exit(1);
+
+    int thread_count=2;
+
+    int * threads = malloc(sizeof(int)*thread_count);
+    determ_task_clock_halt();
+    
+    for(int i=0;i<thread_count;++i){
+        pid_t pid = fork();
+        if (pid==0){
+            determ_task_clock_init();
+            sleep(2);
+            test1((determ_task_get_id()+1)*10000);
+            wait_turn();
+            test1((determ_task_get_id()+1)*10000);
+            wait_turn();
+            /*test1((determ_task_get_id()+1)*100000);
+            wait_turn();
+            test1((determ_task_get_id()+1)*10000);
+            wait_turn();
+            test1((determ_task_get_id()+1)*10000);
+            wait_turn();
+            test1((determ_task_get_id()+1)*1000000);
+            wait_turn();
+            test1((determ_task_get_id()+1)*1000);
+            wait_turn();*/
+            determ_task_clock_halt();
+            exit(1);
+        }
+        else{
+            threads[i]=pid;
+        }
     }
-    else{
-      threads[i]=pid;
+    
+    int status;
+    for(int i=0;i<thread_count;++i){
+        waitpid(threads[i], &status, 0);
     }
-  }
-  
-  int status;
-  for(int i=0;i<thread_count;++i){
-    waitpid(threads[i], &status, 0);
-  }
-  
-  determ_debugging_print_event();
-  //test1();
-  //sleep(1);
-  //test1();
+    
+    determ_debugging_print_event();
+    //test1();
+    //sleep(1);
+    //test1();
 }

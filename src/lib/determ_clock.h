@@ -45,7 +45,7 @@
 
 
    //how many instructions to count before generating a sample
-#define DETERM_CLOCK_SAMPLE_PERIOD 500000
+#define DETERM_CLOCK_SAMPLE_PERIOD 10000
 
 #define DETERM_CLOCK_NOT_WAITING 0
 #define DETERM_CLOCK_LOWEST 1
@@ -54,12 +54,14 @@
      
      static void determ_clock_init();
      void determ_task_clock_init();
+     void determ_task_clock_init_with_id(u_int32_t id);
      u_int64_t determ_task_clock_read();
      void determ_task_clock_is_lowest_wait();
      void determ_task_clock_start();
      void determ_task_clock_stop();
      void determ_task_clock_halt();
      void determ_task_clock_activate();
+     void determ_task_clock_activate_other(int32_t id);
      void determ_debugging_print_event();
      u_int32_t determ_task_get_id();
      struct determ_task_clock_info determ_task_clock_get_info();

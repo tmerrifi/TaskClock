@@ -56,7 +56,7 @@ void perf_counter_init(u_int32_t sample_period, int32_t group_fd, struct perf_co
   void * ring_buffer;
 
   //16MB ring buffer
-  if ((ring_buffer = mmap(NULL, PAGE_SIZE + (PAGE_SIZE * 1024) , PROT_READ | PROT_WRITE,
+  if ((ring_buffer = mmap(NULL, PAGE_SIZE + (PAGE_SIZE * 64) , PROT_READ | PROT_WRITE,
 			  MAP_SHARED, fd, 0)) == MAP_FAILED) {
       
       fprintf(stderr, "\nFAILED! %d fd %d %d\n", getpid(), fd, errno);
@@ -74,10 +74,10 @@ void perf_counter_init(u_int32_t sample_period, int32_t group_fd, struct perf_co
 
 void perf_counter_start(struct perf_counter_info * pci){
 
-  if ( ioctl(pci->fd, PERF_EVENT_IOC_RESET, 0) != 0){
+    /*if ( ioctl(pci->fd, PERF_EVENT_IOC_RESET, 0) != 0){
     printf("\nreset wrong\n");
     exit(EXIT_FAILURE);
-  }
+    }*/
   
   if ( ioctl(pci->fd, PERF_EVENT_IOC_ENABLE, 0) != 0){
     printf("\nenable wrong\n");

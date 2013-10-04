@@ -21,10 +21,9 @@ MODULE_LICENSE("GPL");
 
 #define __get_base_ticks(group_info, tid) (group_info->clocks[tid].base_ticks)
 
-#define __set_clock_ticks(group_info, tid) \
+#define __set_clock_ticks(group_info, tid)                            \
     long rawcount = local64_read(&group_info->clocks[tid].event->count); \
-    BUG_ON((rawcount + group_info->clocks[tid].base_ticks) < group_info->clocks[tid].ticks); \
-    group_info->clocks[tid].ticks=rawcount + group_info->clocks[tid].base_ticks;
+    group_info->clocks[tid].ticks=rawcount;
 
 #define __get_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks)
 
@@ -46,7 +45,7 @@ int32_t __search_for_lowest(struct task_clock_group_info * group_info){
   for (;i<TASK_CLOCK_MAX_THREADS;++i){
     struct task_clock_entry_info * entry = &group_info->clocks[i];
     if (entry->initialized && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
-      min_tid=i;
+        min_tid=i;
     }
   }
 
@@ -128,6 +127,12 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   spin_lock_irqsave(&group_info->nmi_lock, flags);
   __set_clock_ticks(group_info, current->task_clock.tid);
   new_low=__new_lowest(group_info, current->task_clock.tid);
+
+
+#if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
+  printk(KERN_EMERG "TASK CLOCK: overflow id %d ticks %llu\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
+#endif
+
   if (new_low >= 0 && new_low != current->task_clock.tid){
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
       printk(KERN_EMERG "TASK CLOCK: new low %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
@@ -156,7 +161,15 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
          current->task_clock.tid, group_info->lowest_tid, current->task_clock.user_status->lowest_clock, current->pid);
 #endif
 
-  if(group_info->lowest_tid == current->task_clock.tid){
+  //we need to do this if a low has not been designated
+  if (group_info->lowest_tid == -1){
+      //we need to find the new lowest and set it
+      int32_t new_low=__new_lowest(group_info, current->task_clock.tid);
+      group_info->lowest_tid=new_low;
+  }
+
+  if (group_info->lowest_tid == current->task_clock.tid){
+
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
       printk(KERN_EMERG "----TASK CLOCK: in disable...%d is lowest with %llu ticks\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
 #endif
@@ -175,12 +188,14 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
       //after we return from this function we'll have to call poll(), so we can set the waiting flag now
       group_info->clocks[current->task_clock.tid].waiting=1;
   }
+#if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
+      printk(KERN_EMERG "--------TASK CLOCK: setting user clock ticks to %llu, \n", __get_clock_ticks(group_info, current->task_clock.tid));
+#endif
 
   current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
   //we need to store away the current ticks in our base_ticks field...so that next time around this 
   //info will persist
   __set_base_ticks(group_info, current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
-
 
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
@@ -200,9 +215,6 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
 #endif
         group_info->notification_needed=1;
     }
-    else if (group_info->lowest_tid==-1){
-        group_info->lowest_tid=current->task_clock.tid;
-    }
 
     spin_unlock_irqrestore(&group_info->lock, flags);
 }
@@ -219,11 +231,15 @@ void __init_task_clock_entries(struct task_clock_group_info * group_info){
 }
 
 void task_clock_entry_init(struct task_clock_group_info * group_info, struct perf_event * event){
-    //store the event pointer to use later
+    if (group_info->clocks[current->task_clock.tid].initialized==0){
+        group_info->clocks[current->task_clock.tid].ticks=0;
+        group_info->clocks[current->task_clock.tid].base_ticks=0;
+    }
     group_info->clocks[current->task_clock.tid].initialized=1;
     group_info->clocks[current->task_clock.tid].event=event;
-    group_info->clocks[current->task_clock.tid].ticks=0;
-    group_info->clocks[current->task_clock.tid].base_ticks=0;
+    group_info->clocks[current->task_clock.tid].inactive=0;
+    group_info->clocks[current->task_clock.tid].waiting=0;
+
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
   printk(KERN_EMERG "TASK CLOCK: INIT, tid %d event is %p....ticks are %llu \n", current->task_clock.tid, event, __get_clock_ticks(group_info, current->task_clock.tid));
 #endif
@@ -251,12 +267,10 @@ void task_clock_entry_halt(struct task_clock_group_info * group_info){
   //make us inactive
   group_info->clocks[current->task_clock.tid].inactive=1;
   //are we the lowest?
-  if (group_info->lowest_tid==current->task_clock.tid){
+  if (group_info->lowest_tid==current->task_clock.tid || group_info->lowest_tid==-1){
       group_info->notification_needed=1;
       //we need to find the new lowest and set it
       new_low=__new_lowest(group_info, current->task_clock.tid);
-      __debug_print(group_info);
-
       //is there a new_low?
       group_info->lowest_tid=(new_low >= 0) ? new_low : -1;
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
@@ -295,6 +309,28 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
+void task_clock_entry_activate_other(struct task_clock_group_info * group_info, int32_t id){
+    
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);
+#if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
+    printk(KERN_EMERG "TASK CLOCK: activating_other %d activating %d\n", current->task_clock.tid, id);
+#endif
+    if (group_info->clocks[id].initialized==0){
+        //this is activating a new thread...so it needs to inherit the activating parent's clock + 1
+        group_info->clocks[id].initialized=1;
+        group_info->clocks[id].ticks=group_info->clocks[current->task_clock.tid].ticks + 1;
+        group_info->clocks[id].base_ticks=0;
+#if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
+        printk(KERN_EMERG "--------TASK CLOCK: Thread %d is setting thread %d's clock to %llu\n", current->task_clock.tid, id, group_info->clocks[id].ticks);
+#endif
+    }
+    group_info->clocks[current->task_clock.tid].inactive=0;
+    group_info->clocks[current->task_clock.tid].waiting=0;
+
+    spin_unlock_irqrestore(&group_info->lock, flags);
+}
+
 //TODO:Need to remove this and from the kernel
 void task_clock_on_wait(struct task_clock_group_info * group_info){ }
 
@@ -308,6 +344,7 @@ int init_module(void)
   task_clock_func.task_clock_on_disable=task_clock_on_disable;
   task_clock_func.task_clock_on_enable=task_clock_on_enable;
   task_clock_func.task_clock_on_wait=task_clock_on_wait;
+  task_clock_func.task_clock_entry_activate_other=task_clock_entry_activate_other;
   return 0;
 }
 
@@ -321,4 +358,5 @@ void cleanup_module(void)
   task_clock_func.task_clock_on_disable=NULL;
   task_clock_func.task_clock_on_enable=NULL;
   task_clock_func.task_clock_on_wait=NULL;
+  task_clock_func.task_clock_entry_activate_other=NULL;
 }

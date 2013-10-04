@@ -288,6 +288,7 @@ struct perf_event_attr {
 #define PERF_EVENT_IOC_SET_FILTER	    _IOW('$', 6, char *)
 #define PERF_EVENT_IOC_TASK_CLOCK_HALT      _IO ('$', 7)
 #define PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE  _IO ('$', 8)
+#define PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE_OTHER  _IO ('$', 9)
 
 enum perf_event_ioc_flags {
 	PERF_IOC_FLAG_GROUP		= 1U << 0,
