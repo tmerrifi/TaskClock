@@ -36,7 +36,6 @@ struct determ_task_clock_info determ_task_clock_get_info(){
 //making a simple system call to let the kernel know where the tick array is located
 void __make_clock_sys_call(void * address, size_t tid, size_t fd){
   struct ftracer * tracer;
-  //printf("the address of the user data %p pid %d tid %d\n", address, getpid(), tid);
   syscall(__TASK_CLOCK_SYS_CALL, fd, (unsigned long)address, tid);
 }
 
@@ -112,7 +111,6 @@ void determ_task_clock_init_with_id(u_int32_t id){
     memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
     //set up the task clock for our process
     __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
-    printf("INITING %d\n", task_clock_info.tid);
     //set up the performance counter
     perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter.fd, &task_clock_info.perf_counter);
 }
@@ -151,7 +149,6 @@ void determ_task_clock_activate(){
 }
 
 void determ_task_clock_activate_other(int32_t id){
-    printf("HERE????? %d\n", id);
   if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE_OTHER, id) != 0){
     printf("\nClock start failed\n");
     exit(EXIT_FAILURE);
@@ -166,7 +163,6 @@ void determ_task_clock_start(){
 
 //No longer counting, but still can be named "lowest" clock
 void determ_task_clock_stop(){
-    printf("STOP: %d\n", task_clock_info.tid);
     perf_counter_stop(&task_clock_info.perf_counter);
 }
 
