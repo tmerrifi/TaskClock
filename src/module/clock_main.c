@@ -21,8 +21,9 @@ MODULE_LICENSE("GPL");
 
 #define __get_base_ticks(group_info, tid) (group_info->clocks[tid].base_ticks)
 
+//TODO: get rid of that div. by 100
 #define __set_clock_ticks(group_info, tid)                            \
-    long rawcount = local64_read(&group_info->clocks[tid].event->count); \
+    long rawcount = local64_read(&group_info->clocks[tid].event->count) / 100; \
     group_info->clocks[tid].ticks=rawcount;
 
 #define __get_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks)
@@ -108,6 +109,7 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
       group_info->notification_needed=0;
       //the lowest must be notified
       struct perf_event * event = group_info->clocks[group_info->lowest_tid].event;
+      //__debug_print(group_info);
       __wake_up_waiting_thread(event);
   }
   else{
