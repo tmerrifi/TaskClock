@@ -23,13 +23,17 @@ MODULE_LICENSE("GPL");
 
 //TODO: get rid of that div. by 100
 #define __set_clock_ticks(group_info, tid)                            \
-    long rawcount = local64_read(&group_info->clocks[tid].event->count) / 100; \
+    long rawcount = local64_read(&group_info->clocks[tid].event->count) / 1000; \
     group_info->clocks[tid].ticks=rawcount;
 
-#define __get_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks)
+#define __get_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks + group_info->clocks[tid].base_ticks)
 
-#define __clock_is_lower(group_info, tid1, tid2) ((group_info->clocks[tid1].ticks < group_info->clocks[tid2].ticks) \
-						  || (group_info->clocks[tid1].ticks == group_info->clocks[tid2].ticks && (tid1 < tid2)))
+
+#define __clock_is_lower(group_info, tid1, tid2) ((__get_clock_ticks(group_info, tid1) < __get_clock_ticks(group_info, tid2)) \
+						  || (__get_clock_ticks(group_info, tid1) == __get_clock_ticks(group_info, tid2) && (tid1 < tid2)))
+
+//#define __clock_is_lower(group_info, tid1, tid2) ((group_info->clocks[tid1].ticks < group_info->clocks[tid2].ticks) \
+//						  || (group_info->clocks[tid1].ticks == group_info->clocks[tid2].ticks && (tid1 < tid2)))
 
 //is this current tick_count the lowest
 int __is_lowest(struct task_clock_group_info * group_info, int32_t tid){
@@ -105,7 +109,8 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
   printk(KERN_EMERG "TASK CLOCK: beginning notification of %d\n", group_info->lowest_tid);
 #endif
 
-  if (group_info->notification_needed){
+  if (group_info->notification_needed || group_info->nmi_new_low){
+      group_info->nmi_new_low=0;
       group_info->notification_needed=0;
       //the lowest must be notified
       struct perf_event * event = group_info->clocks[group_info->lowest_tid].event;
@@ -135,7 +140,8 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   printk(KERN_EMERG "TASK CLOCK: overflow id %d ticks %llu\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
 #endif
 
-  if (new_low >= 0 && new_low != current->task_clock.tid){
+  if (new_low >= 0 && new_low != current->task_clock.tid && group_info->nmi_new_low==0){
+      group_info->nmi_new_low=1;
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
       printk(KERN_EMERG "TASK CLOCK: new low %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
 #endif
@@ -155,43 +161,45 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
 //case, we need to figure out if they are the lowest and let them know before they call poll
 void task_clock_on_disable(struct task_clock_group_info * group_info){
   unsigned long flags;
+
   //TODO: Why are we disabling interrupts here?
   spin_lock_irqsave(&group_info->lock, flags);
+
   //am I the lowest?
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
   printk(KERN_EMERG "TASK CLOCK: disabling %d...lowest is %d lowest clock is %d pid %d\n", 
          current->task_clock.tid, group_info->lowest_tid, current->task_clock.user_status->lowest_clock, current->pid);
 #endif
 
-  //we need to do this if a low has not been designated
-  if (group_info->lowest_tid == -1){
-      //we need to find the new lowest and set it
-      int32_t new_low=__new_lowest(group_info, current->task_clock.tid);
+  //update our clock in case some of the instructions weren't counted in the overflow handler
+  __set_clock_ticks(group_info, current->task_clock.tid);
+
+  int32_t oldlow = group_info->lowest_tid;
+
+  int32_t new_low=__new_lowest(group_info, current->task_clock.tid);
+  if (new_low >=0 && new_low!=group_info->lowest_tid){
+      group_info->notification_needed=1;
       group_info->lowest_tid=new_low;
   }
-
+  
   if (group_info->lowest_tid == current->task_clock.tid){
-
-#if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
-      printk(KERN_EMERG "----TASK CLOCK: in disable...%d is lowest with %llu ticks\n", current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
-#endif
       current->task_clock.user_status->lowest_clock=1;
       group_info->notification_needed=0;
   }
   else{
-      //there could be a race between the overflow handler and setting "waiting" to be 1. Therefore, we need to check here if the lowest guy is waiting and
-      //no one has sent a notification
-#if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
-      printk(KERN_EMERG "--------TASK CLOCK: in disable...%d, need to wait\n", current->task_clock.tid);
-#endif
+      current->task_clock.user_status->lowest_clock=0;
       if (__new_low_is_waiting(group_info, group_info->lowest_tid) && group_info->notification_needed){
-          irq_work_queue(&group_info->pending_work);
+          group_info->nmi_new_low=0;
+          group_info->notification_needed=0;
+          //the lowest must be notified
+          struct perf_event * event = group_info->clocks[group_info->lowest_tid].event;
+          __wake_up_waiting_thread(event);
       }
       //after we return from this function we'll have to call poll(), so we can set the waiting flag now
       group_info->clocks[current->task_clock.tid].waiting=1;
   }
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
-      printk(KERN_EMERG "--------TASK CLOCK: setting user clock ticks to %llu, \n", __get_clock_ticks(group_info, current->task_clock.tid));
+  printk(KERN_EMERG "--------TASK CLOCK: setting user clock ticks to %llu, \n", __get_clock_ticks(group_info, current->task_clock.tid));
 #endif
 
   current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
@@ -216,9 +224,14 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
         printk(KERN_EMERG "----TASK CLOCK: ENABLING %d and setting notification to 1 %d\n", current->task_clock.tid);
 #endif
         group_info->notification_needed=1;
+        group_info->nmi_new_low=0;
     }
 
     spin_unlock_irqrestore(&group_info->lock, flags);
+
+    //we need to store away the current ticks in our base_ticks field...so that next time around this 
+    //info will persist
+    __set_base_ticks(group_info, current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
 }
 
 void __init_task_clock_entries(struct task_clock_group_info * group_info){
@@ -253,6 +266,7 @@ struct task_clock_group_info * task_clock_group_init(void){
   spin_lock_init(&group_info->lock);
   group_info->lowest_tid=-1;
   group_info->notification_needed=1;
+  group_info->nmi_new_low=0;
   __init_task_clock_entries(group_info);
   init_irq_work(&group_info->pending_work, __task_clock_notify_waiting_threads);
   return group_info;
@@ -304,9 +318,9 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
       printk(KERN_EMERG "TASK CLOCK: activated thread is the new low,  %d\n", current->task_clock.tid);
 #endif
-      current->task_clock.user_status->lowest_clock=1;
       group_info->notification_needed=0;
       group_info->lowest_tid=new_low;
+      current->task_clock.user_status->lowest_clock=1;
   }
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
