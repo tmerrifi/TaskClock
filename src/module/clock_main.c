@@ -22,9 +22,11 @@ MODULE_LICENSE("GPL");
 #define __get_base_ticks(group_info, tid) (group_info->clocks[tid].base_ticks)
 
 //TODO: get rid of that div. by 100
-#define __set_clock_ticks(group_info, tid)                            \
+#define __update_clock_ticks(group_info, tid)                            \
     long rawcount = local64_read(&group_info->clocks[tid].event->count) / 1000; \
     group_info->clocks[tid].ticks=rawcount;
+
+#define __set_clock_ticks(group_info, tid, val) (group_info->clocks[tid].ticks=val)
 
 #define __get_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks + group_info->clocks[tid].base_ticks)
 
@@ -132,7 +134,7 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   int32_t new_low=-1;
 
   spin_lock_irqsave(&group_info->nmi_lock, flags);
-  __set_clock_ticks(group_info, current->task_clock.tid);
+  __update_clock_ticks(group_info, current->task_clock.tid);
   new_low=__new_lowest(group_info, current->task_clock.tid);
 
 
@@ -172,7 +174,11 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
 #endif
 
   //update our clock in case some of the instructions weren't counted in the overflow handler
-  __set_clock_ticks(group_info, current->task_clock.tid);
+  __update_clock_ticks(group_info, current->task_clock.tid);
+  //base ticks need to be set to our current tick value, so we can use them next time
+  __set_base_ticks(group_info, current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
+  //now set the clock ticks to zero...since base_ticks is updated
+  __set_clock_ticks(group_info, current->task_clock.tid, 0);
 
   int32_t oldlow = group_info->lowest_tid;
 
@@ -180,6 +186,11 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
   if (new_low >=0 && new_low!=group_info->lowest_tid){
       group_info->notification_needed=1;
       group_info->lowest_tid=new_low;
+  }
+
+  if (__get_clock_ticks(group_info, current->task_clock.tid)==2040){
+      __debug_print(group_info);
+      printk(KERN_EMERG "id %d and new_low %d and current lowest %d\n", current->task_clock.tid, new_low, group_info->lowest_tid);
   }
   
   if (group_info->lowest_tid == current->task_clock.tid){
@@ -205,7 +216,6 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
   current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
   //we need to store away the current ticks in our base_ticks field...so that next time around this 
   //info will persist
-  __set_base_ticks(group_info, current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
 
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
@@ -231,7 +241,9 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
 
     //we need to store away the current ticks in our base_ticks field...so that next time around this 
     //info will persist
-    __set_base_ticks(group_info, current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
+    if (__get_base_ticks(group_info, current->task_clock.tid)==0){
+        __set_base_ticks(group_info, current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));
+    }
 }
 
 void __init_task_clock_entries(struct task_clock_group_info * group_info){
