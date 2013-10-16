@@ -23,9 +23,10 @@
    } __attribute__ ((aligned (8), packed));
 
    struct determ_task_clock_info{
-     u_int32_t tid;
-     struct perf_counter_info perf_counter;
-     struct task_clock_user_status * user_status;
+       u_int32_t tid;
+       struct perf_counter_info perf_counter;
+       struct task_clock_user_status * user_status;
+       u_int8_t disabled;
    };
 
 #define DETERM_CLOCK_MAX_THREADS 100
@@ -56,7 +57,7 @@
      void determ_task_clock_init();
      void determ_task_clock_init_with_id(u_int32_t id);
      u_int64_t determ_task_clock_read();
-     void determ_task_clock_is_lowest_wait();
+     int determ_task_clock_is_lowest_wait();
      void determ_task_clock_start();
      void determ_task_clock_stop();
      void determ_task_clock_halt();

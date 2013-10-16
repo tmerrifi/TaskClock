@@ -9,12 +9,12 @@ LIBS = -lrt -lksnap
 all : dynlib module
 
 dynlib: $(SOURCES) 
-	sudo cp lib/*.h /usr/include; \
 	gcc -shared $(CFLAGS) -o libDetermTaskClock.so $(SOURCES) $(LIBS); \
 	sudo cp libDetermTaskClock.so /usr/lib; \
 
 
 %.o : %.c
+	sudo cp lib/*.h /usr/include; \
 	gcc $(CFLAGS) -o $@ -c $< $(LIBS);
 
 tests : $(TESTS)

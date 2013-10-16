@@ -109,6 +109,7 @@ void determ_task_clock_init_with_id(u_int32_t id){
     //allocating the user status which is looked at by the kernel
     task_clock_info.user_status = &clock_info->user_status[task_clock_info.tid]; //malloc(sizeof(struct task_clock_user_status));
     memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
+    task_clock_info.disabled=0;
     //set up the task clock for our process
     __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
     //set up the performance counter
@@ -122,9 +123,17 @@ u_int64_t determ_task_clock_read(){
 }
 
 //we arrive here if we're the lowest clock, else we need to poll and wait
-void determ_task_clock_is_lowest_wait(){
+int determ_task_clock_is_lowest_wait(){
     //are we the lowest? If we are, no reason to wait around
     int polled=0;
+    
+    if (!task_clock_info.disabled){
+        if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
+            printf("\nClock wait failed\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
     if (!task_clock_info.user_status->lowest_clock){
         //poll on the fd of the perf_event
         struct pollfd fds;
@@ -138,14 +147,16 @@ void determ_task_clock_is_lowest_wait(){
     //ok, now set the debugging stuff
     clock_info->event_debugging[count]=task_clock_info.tid;
     clock_info->event_tick_debugging[count]=task_clock_info.user_status->ticks;
-    return;
+    return polled;
 }
 
 void determ_task_clock_activate(){
-  if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE, 0) != 0){
-    printf("\nClock start failed\n");
-    exit(EXIT_FAILURE);
-  }
+    task_clock_info.user_status->lowest_clock=0;
+    task_clock_info.disabled=0;
+    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE, 0) != 0){
+        printf("\nClock start failed\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void determ_task_clock_activate_other(int32_t id){
@@ -157,12 +168,14 @@ void determ_task_clock_activate_other(int32_t id){
 
 
 void determ_task_clock_start(){
+    task_clock_info.disabled=0;
     task_clock_info.user_status->lowest_clock=0;
     perf_counter_start(&task_clock_info.perf_counter);
 }
 
 //No longer counting, but still can be named "lowest" clock
 void determ_task_clock_stop(){
+    task_clock_info.disabled=1;
     perf_counter_stop(&task_clock_info.perf_counter);
 }
 
