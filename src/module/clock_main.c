@@ -56,7 +56,7 @@ unsigned long __elapsed_time_ns(struct timespec * t1, struct timespec * t2){
     group_info->clocks[tid].debug_last_overflow_ticks=rawcount; \
     int msb = fls_long(rawcount); \
     if (msb > 9){                                                       \
-        group_info->clocks[tid].ticks+=(rawcount & ~((1 << (msb - 2)) - 1));\
+        group_info->clocks[tid].ticks+=rawcount; \ 
     }\
     local64_set(&group_info->clocks[tid].event->count, 0);
 
@@ -215,11 +215,13 @@ void __update_period(struct task_clock_group_info * group_info){
         }
         group_info->clocks[current->task_clock.tid].debug_last_sample_period = group_info->clocks[current->task_clock.tid].event->hw.sample_period;
         group_info->clocks[current->task_clock.tid].event->hw.sample_period =  __min(new_sample_period, MAX_CLOCK_SAMPLE_PERIOD);
-        local64_set(&group_info->clocks[current->task_clock.tid].event->hw.period_left,0);
     }
 }
 
-
+void __reset_period(struct task_clock_group_info * group_info){
+    group_info->clocks[current->task_clock.tid].event->hw.sample_period=0;
+    local64_set(&group_info->clocks[current->task_clock.tid].event->hw.period_left,0);
+}
 
 void task_clock_entry_overflow_update_period(struct task_clock_group_info * group_info){
     unsigned long flags;
@@ -343,6 +345,7 @@ void task_clock_add_ticks(struct task_clock_group_info * group_info, int32_t tic
   spin_lock_irqsave(&group_info->lock, flags);
   __inc_clock_ticks(group_info, current->task_clock.tid, ticks);
   current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
+  __determine_lowest_and_notify_or_wait(group_info);
 
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
@@ -356,8 +359,10 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
     group_info->clocks[current->task_clock.tid].inactive=0;
     group_info->clocks[current->task_clock.tid].waiting=0;
     group_info->clocks[current->task_clock.tid].sleeping=0;
-    group_info->clocks[group_info->lowest_tid].event->hw.sample_period=0;
+    __reset_period(group_info);
     __update_period(group_info);
+
+
     __determine_lowest_and_notify_or_wait(group_info);
     //are we the lowest?
     if (group_info->lowest_tid==current->task_clock.tid){
