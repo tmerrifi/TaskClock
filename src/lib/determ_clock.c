@@ -13,6 +13,7 @@
 #include <sys/ioctl.h>
 #include <sched.h>
 #include <ftrace.h>
+#include <time.h>
 
 #include "determ_clock.h"
 #include "perf_counter.h"
@@ -28,6 +29,8 @@ struct determ_task_clock_info task_clock_info;
 #else
 #define __TASK_CLOCK_SYS_CALL 342
 #endif
+
+#define MAX_SPIN_INT 1000000
 
 struct determ_task_clock_info determ_task_clock_get_info(){
     return task_clock_info;
@@ -109,12 +112,29 @@ void determ_task_clock_init_with_id(u_int32_t id){
     //allocating the user status which is looked at by the kernel
     task_clock_info.user_status = &clock_info->user_status[task_clock_info.tid]; //malloc(sizeof(struct task_clock_user_status));
     memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
-    task_clock_info.disabled=0;
+    task_clock_info.disabled=1;
     //set up the task clock for our process
     __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
     //set up the performance counter
     perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter.fd, &task_clock_info.perf_counter);
 }
+
+u_int64_t determ_debug_notifying_clock_read(){
+    return task_clock_info.user_status->notifying_clock;
+}
+
+int determ_debug_notifying_id_read(){
+    return task_clock_info.user_status->notifying_id;
+}
+
+int determ_debug_notifying_sample_read(){
+    return task_clock_info.user_status->notifying_sample;
+}
+
+int determ_debug_notifying_diff_read(){
+    return task_clock_info.user_status->notifying_diff;
+}
+
 
 u_int64_t determ_task_clock_read(){
     //perf_counter_stop(task_clock_info.perf_counter);
@@ -122,27 +142,59 @@ u_int64_t determ_task_clock_read(){
     return task_clock_info.user_status->ticks;
 }
 
+int determ_task_clock_is_lowest(){
+    if (!task_clock_info.disabled){
+        if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
+            printf("\nClock wait failed\n");
+            exit(EXIT_FAILURE);
+        }
+        task_clock_info.disabled=1;
+    }
+
+    return task_clock_info.user_status->lowest_clock;
+}
+
 //we arrive here if we're the lowest clock, else we need to poll and wait
 int determ_task_clock_is_lowest_wait(){
     //are we the lowest? If we are, no reason to wait around
     int polled=0;
+    struct timespec t1,t2;
     
     if (!task_clock_info.disabled){
         if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
             printf("\nClock wait failed\n");
             exit(EXIT_FAILURE);
         }
+        task_clock_info.disabled=1;
     }
+    
+    clock_gettime(CLOCK_REALTIME, &t1);
+    int spin_counter=0;
+    while(!task_clock_info.user_status->lowest_clock && spin_counter<MAX_SPIN_INT){
+        ++spin_counter;
+    }
+    clock_gettime(CLOCK_REALTIME, &t2);
+    polled=time_util_time_diff(&t1, &t2);
 
     if (!task_clock_info.user_status->lowest_clock){
-        //poll on the fd of the perf_event
-        struct pollfd fds;
-        memset(&fds, 0, sizeof(struct pollfd));
-        fds.fd = task_clock_info.perf_counter.fd;
-        fds.events = POLLIN;
-        poll(&fds, 1, -1);
-        polled=1;
+        if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_SLEEP, 0) != 0){
+            printf("\nClock wait failed\n");
+            exit(EXIT_FAILURE);
+        }
+        if (!task_clock_info.user_status->lowest_clock){
+            //poll on the fd of the perf_event
+            struct pollfd fds;
+            memset(&fds, 0, sizeof(struct pollfd));
+            fds.fd = task_clock_info.perf_counter.fd;
+            fds.events = POLLIN;
+            poll(&fds, 1, -1);
+            polled=2;
+        }
+        else{
+            polled=3;
+        }
     }
+
     u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
     //ok, now set the debugging stuff
     clock_info->event_debugging[count]=task_clock_info.tid;
@@ -154,6 +206,13 @@ void determ_task_clock_activate(){
     task_clock_info.user_status->lowest_clock=0;
     task_clock_info.disabled=0;
     if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE, 0) != 0){
+        printf("\nClock start failed\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void determ_task_clock_add_ticks(int32_t ticks){
+    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ADD_TICKS, ticks) != 0){
         printf("\nClock start failed\n");
         exit(EXIT_FAILURE);
     }
