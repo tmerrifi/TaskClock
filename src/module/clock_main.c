@@ -22,6 +22,28 @@ MODULE_LICENSE("GPL");
 
 #define MIN_CLOCK_SAMPLE_PERIOD 1024
 
+struct clock_debug{
+    uint64_t clocks[5];
+    uint64_t clocks_computed[5];
+    uint64_t initialized[5];
+    uint64_t sleeping[5];
+    int new_low;
+    int new_low_computed;
+    uint64_t lowest_clock;
+    int event;
+    int current_is_lowest;
+    int current_id;
+};
+
+#define clock_debug_max_entries 2500
+
+struct clock_debug clock_debug[clock_debug_max_entries];
+struct clock_debug clock_debug_overflow[clock_debug_max_entries];
+
+int debug_counter;
+int debug_counter_overflow;;
+
+
 int __lowest_time(struct timespec * t1, struct timespec * t2){
     if (t1->tv_sec != t2->tv_sec){
         return (t1->tv_sec < t2->tv_sec) ? 1 : 2;
@@ -50,15 +72,31 @@ unsigned long __elapsed_time_ns(struct timespec * t1, struct timespec * t2){
 
 #define __get_base_ticks(group_info, tid) (group_info->clocks[tid].base_ticks)
 
-//TODO: get rid of that div. by 100
-#define __update_clock_ticks(group_info, tid)                            \
+
+#ifdef NO_INSTRUCTION_COUNTING
+
+#define __update_clock_ticks(group_info, tid)                           \
     unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); \
-    group_info->clocks[tid].debug_last_overflow_ticks=rawcount; \
-    int msb = fls_long(rawcount); \
+    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         \
+    int msb = fls_long(rawcount);                                       \
     if (msb > 9){                                                       \
-        group_info->clocks[tid].ticks+=rawcount; \ 
-    }\
-    local64_set(&group_info->clocks[tid].event->count, 0);
+    group_info->clocks[tid].ticks+=0; \ 
+}                                                               \
+local64_set(&group_info->clocks[tid].event->count, 0);
+
+
+#else
+
+//TODO: get rid of that div. by 100
+#define __update_clock_ticks(group_info, tid)                           \
+    unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); \
+    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         \
+    int msb = fls_long(rawcount);                                       \
+    if (msb > 9){                                                       \
+    group_info->clocks[tid].ticks+=rawcount; \ 
+}                                                               \
+local64_set(&group_info->clocks[tid].event->count, 0);
+#endif
 
 #define __inc_clock_ticks(group_info, tid, val) (group_info->clocks[tid].ticks+=val)
 
@@ -67,8 +105,11 @@ unsigned long __elapsed_time_ns(struct timespec * t1, struct timespec * t2){
 #define __get_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks + group_info->clocks[tid].base_ticks)
 
 
-#define __clock_is_lower(group_info, tid1, tid2) ((__get_clock_ticks(group_info, tid1) < __get_clock_ticks(group_info, tid2)) \
-						  || (__get_clock_ticks(group_info, tid1) == __get_clock_ticks(group_info, tid2) && (tid1 < tid2)))
+#define __clock_is_lower(group_info, tid1, tid2) ( ((__get_clock_ticks(group_info, tid1))  < (__get_clock_ticks(group_info, tid2))) \
+                                               || ((__get_clock_ticks(group_info, tid1)) == (__get_clock_ticks(group_info, tid2))  && (tid1 < tid2)))
+
+//#define __clock_is_lower(group_info, tid1, tid2) ( ((__get_clock_ticks(group_info, tid1) - group_info->lowest_ticks)  < (__get_clock_ticks(group_info, tid2)  - group_info->lowest_ticks)) \
+//                                                 || ((__get_clock_ticks(group_info, tid1) - group_info->lowest_ticks) == (__get_clock_ticks(group_info, tid2) - group_info->lowest_ticks)  && (tid1 < tid2)))
 
 //is this current tick_count the lowest
 int __is_lowest(struct task_clock_group_info * group_info, int32_t tid){
@@ -92,18 +133,6 @@ int32_t  __search_for_lowest_waiting_exclude_current(struct task_clock_group_inf
   return (min_tid >=0) ? min_tid : -1;
 }
 
-int32_t  __search_for_lowest_waiting_and_current(struct task_clock_group_info * group_info, int32_t tid){
-  int i=0;
-  int32_t min_tid=-1;
-  for (;i<TASK_CLOCK_MAX_THREADS;++i){
-    struct task_clock_entry_info * entry = &group_info->clocks[i];
-    if (entry->initialized && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
-        min_tid=i;
-    }
-  }
-
-  return (min_tid==tid || (min_tid >=0 && group_info->clocks[min_tid].waiting)) ? min_tid : -1;
-}
 
 int32_t __search_for_lowest(struct task_clock_group_info * group_info){
   int i=0;
@@ -118,8 +147,27 @@ int32_t __search_for_lowest(struct task_clock_group_info * group_info){
   return min_tid;
 }
 
+//This function must be called while holding the group lock
+int32_t __search_for_lowest_waiting(struct task_clock_group_info * group_info){
+    int thread_arr[TASK_CLOCK_MAX_THREADS];
+    int i=0;
+    int low=-1;
+
+    for (;i<TASK_CLOCK_MAX_THREADS;++i){
+        struct task_clock_entry_info * entry = &group_info->clocks[i];
+        if (entry->waiting){
+            thread_arr[i]=1;
+        }
+    }
+    
+    //now find the lowest
+    low=__search_for_lowest(group_info);
+    //if the lowest is greater than zero and it was waiting...return it
+    return (low >= 0 && thread_arr[low]==1) ? low : -1;
+}
+
 void __debug_print(struct task_clock_group_info * group_info){
-  int i=0;
+  int i=1300;
   printk(KERN_EMERG "\n\nSEARCH FOR LOWEST....%d\n", current->task_clock.tid);
   for (;i<7;++i){
     struct task_clock_entry_info * entry = &group_info->clocks[i];
@@ -127,6 +175,71 @@ void __debug_print(struct task_clock_group_info * group_info){
     printk(KERN_EMERG " tid: %d ticks %d inactive %d init %d waiting %d::", i, __get_clock_ticks(group_info, i), entry->inactive, entry->initialized, entry->waiting);
   }
 }
+
+void __clock_debug(struct task_clock_group_info * group_info, int new_low, int event){
+    if (debug_counter < clock_debug_max_entries){
+        int i=0;
+        for (;i<5;++i){
+            clock_debug[debug_counter].clocks[i]=__get_clock_ticks(group_info, i);
+            clock_debug[debug_counter].clocks_computed[i]=__get_clock_ticks(group_info, i) - group_info->lowest_ticks;
+            clock_debug[debug_counter].sleeping[i]=group_info->clocks[i].sleeping;
+            clock_debug[debug_counter].initialized[i]=group_info->clocks[i].initialized;
+        }
+        clock_debug[debug_counter].new_low = new_low;
+        clock_debug[debug_counter].new_low_computed = __search_for_lowest_waiting(group_info);
+        clock_debug[debug_counter].lowest_clock = group_info->lowest_ticks;
+        clock_debug[debug_counter].event = event;
+        clock_debug[debug_counter].current_id = current->task_clock.tid;
+        clock_debug[debug_counter].current_is_lowest = group_info->user_status_arr[current->task_clock.tid].lowest_clock;
+        
+        ++debug_counter;
+    }
+}
+
+
+void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_low, int event){
+    if (debug_counter_overflow < clock_debug_max_entries){
+        int i=0;
+        for (;i<5;++i){
+            clock_debug_overflow[debug_counter_overflow].clocks[i]=__get_clock_ticks(group_info, i);
+            clock_debug_overflow[debug_counter_overflow].clocks_computed[i]=__get_clock_ticks(group_info, i) - group_info->lowest_ticks;
+            clock_debug_overflow[debug_counter_overflow].initialized[i]=group_info->clocks[i].initialized;
+        }
+        clock_debug_overflow[debug_counter_overflow].new_low = new_low;
+        clock_debug_overflow[debug_counter_overflow].new_low_computed = __search_for_lowest_waiting(group_info);
+        clock_debug_overflow[debug_counter_overflow].lowest_clock = group_info->lowest_ticks;
+        clock_debug_overflow[debug_counter_overflow].event = event;
+        clock_debug_overflow[debug_counter_overflow].current_id = current->task_clock.tid;
+        ++debug_counter_overflow;
+    }
+}
+
+void __clock_debug_print(){
+    int i=300;
+    for (;i<debug_counter;++i){
+        int j=0;
+        for (;j<5;++j){
+            printk(KERN_EMERG " id: %d clock: %lu computed %lu initialized %d sleeping %d\n", 
+                   j, clock_debug[i].clocks[j], clock_debug[i].clocks_computed[j], clock_debug[i].initialized[j], clock_debug[i].sleeping[j]);
+        }
+        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d, current_marked_lowest: %d", 
+               clock_debug[i].new_low, clock_debug[i].new_low_computed, clock_debug[i].lowest_clock, clock_debug[i].event, clock_debug[i].current_id, clock_debug[i].current_is_lowest);
+    }
+}
+
+void __clock_debug_print_overflow(){
+    int i=0;
+    for (;i<debug_counter_overflow;++i){
+        int j=0;
+        for (;j<5;++j){
+            printk(KERN_EMERG " id: %d clock: %lu computed %lu initialized %d\n", j, clock_debug_overflow[i].clocks[j], clock_debug_overflow[i].clocks_computed[j], clock_debug_overflow[i].initialized[j]);
+        }
+        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d", 
+               clock_debug_overflow[i].new_low, clock_debug_overflow[i].new_low_computed, clock_debug_overflow[i].lowest_clock, clock_debug_overflow[i].event, clock_debug_overflow[i].current_id);
+    }
+}
+
+
 
 //after we execute this function, a new lowest task clock has been determined
 int32_t __new_lowest(struct task_clock_group_info * group_info, int32_t tid){
@@ -159,6 +272,7 @@ int8_t __is_sleeping(struct task_clock_group_info * group_info, int32_t tid){
 void __wake_up_waiting_thread(struct perf_event * event, struct task_clock_group_info * group_info){
   struct perf_buffer * buffer;
   if (__is_sleeping(group_info, group_info->lowest_tid)){
+      __clock_debug(group_info, group_info->lowest_tid, 69);
       rcu_read_lock();
       buffer = rcu_dereference(event->buffer);
       atomic_set(&buffer->poll, POLL_IN);
@@ -171,28 +285,33 @@ void __wake_up_waiting_thread(struct perf_event * event, struct task_clock_group
   }
 }
 
+void __set_new_low(struct task_clock_group_info * group_info, int32_t tid){
+    group_info->lowest_tid=tid;
+    group_info->lowest_ticks=__get_clock_ticks(group_info, tid);
+}
+    
 void __task_clock_notify_waiting_threads(struct irq_work * work){
   unsigned long flags;
   struct task_clock_group_info * group_info = container_of(work, struct task_clock_group_info, pending_work);
   spin_lock_irqsave(&group_info->lock, flags);
-
+  //int new_low=__search_for_lowest(group_info);
+  int new_low=__search_for_lowest_waiting(group_info);
+  
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
-  printk(KERN_EMERG "TASK CLOCK: beginning notification of %d\n", group_info->lowest_tid);
+  printk(KERN_EMERG "TASK CLOCK: beginning notification of %d\n", new_low);
 #endif
-
-  if ((group_info->notification_needed || group_info->nmi_new_low) && __thread_is_waiting(group_info, group_info->lowest_tid)){
-      group_info->nmi_new_low=0;
-      group_info->notification_needed=0;
-      //the lowest must be notified
-      struct perf_event * event = group_info->clocks[group_info->lowest_tid].event;
-      __wake_up_waiting_thread(event, group_info);
+  if (new_low>=0 && __thread_is_waiting(group_info,new_low)){
+      //__clock_debug(group_info, new_low, 3);
+      __set_new_low(group_info,new_low);
+      //__clock_debug(group_info, new_low, 4);
+      if (group_info->notification_needed || group_info->nmi_new_low){
+          group_info->nmi_new_low=0;
+          group_info->notification_needed=0;
+          //the lowest must be notified
+          struct perf_event * event = group_info->clocks[group_info->lowest_tid].event;
+          __wake_up_waiting_thread(event, group_info);
+      }
   }
-  else{
-#if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
-      printk(KERN_EMERG "TASK CLOCK: notification of %d didn't happen because of notification_needed\n", group_info->lowest_tid);
-#endif
-  }
-
 
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
@@ -239,7 +358,7 @@ __debug_token_wakeup(struct task_clock_group_info * group_info){
     group_info->user_status_arr[group_info->lowest_tid].notifying_clock=__get_clock_ticks(group_info,current->task_clock.tid);
     group_info->user_status_arr[group_info->lowest_tid].notifying_id=current->task_clock.tid;
     group_info->user_status_arr[group_info->lowest_tid].notifying_sample=group_info->clocks[current->task_clock.tid].debug_last_sample_period;
-    group_info->user_status_arr[group_info->lowest_tid].notifying_diff=group_info->clocks[current->task_clock.tid].debug_last_overflow_ticks;
+    group_info->user_status_arr[group_info->lowest_tid].notifying_diff=group_info->lowest_ticks;
 
 }
 
@@ -250,6 +369,9 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   int32_t new_low=-1;
 
   spin_lock_irqsave(&group_info->nmi_lock, flags);
+  if (__thread_is_waiting(group_info, current->task_clock.tid)){
+      __clock_debug_overflow(group_info, 0, 10);
+  }
   current->task_clock.user_status->notifying_id++;
   new_low=__new_lowest(group_info, current->task_clock.tid);
   if (new_low >= 0 && new_low != current->task_clock.tid && group_info->nmi_new_low==0){
@@ -258,15 +380,14 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
       printk(KERN_EMERG "TASK CLOCK: new low %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
 #endif
       //there is a new lowest thread, make sure to set it
-      group_info->lowest_tid=new_low;
+      //group_info->lowest_tid=new_low;
       if (__thread_is_waiting(group_info, new_low)){
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
           printk(KERN_EMERG "----TASK CLOCK: notifying %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
 #endif
-          group_info->lowest_ticks=__get_clock_ticks(group_info,group_info->lowest_tid);
           //we use this opportunity to set the lowest threads flag...this way, if its spinning right now
           //it can wake up immediately. 
-          group_info->user_status_arr[group_info->lowest_tid].lowest_clock=1;
+          //group_info->user_status_arr[new_low].lowest_clock=1;
           __debug_token_wakeup(group_info);
           //schedule work to be done when we are not in NMI context
           irq_work_queue(&group_info->pending_work);
@@ -276,16 +397,20 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   spin_unlock_irqrestore(&group_info->nmi_lock, flags);
 }
 
-void __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_info){
+void __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_info, int user_event){
 
-    int32_t new_low=__search_for_lowest_waiting_and_current(group_info, current->task_clock.tid);    
-
-    if (new_low >=0 && new_low!=group_info->lowest_tid){
+    
+    group_info->clocks[current->task_clock.tid].waiting=1;
+    int32_t new_low=__search_for_lowest_waiting(group_info);    
+    __clock_debug(group_info, new_low, (user_event) ? user_event : 7);
+    if (new_low!=group_info->lowest_tid){
         group_info->notification_needed=1;
         group_info->lowest_tid=new_low;
     }
 
-    if (group_info->lowest_tid == current->task_clock.tid && new_low!=-1){
+    
+    if (new_low >= 0 && group_info->lowest_tid == current->task_clock.tid){
+        __clock_debug(group_info, new_low, 1);
         current->task_clock.user_status->lowest_clock=1;
         group_info->notification_needed=0;
         group_info->clocks[current->task_clock.tid].waiting=0;
@@ -295,6 +420,7 @@ void __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_
     else{
         current->task_clock.user_status->lowest_clock=0;
         if (__thread_is_waiting(group_info, group_info->lowest_tid) && group_info->notification_needed){
+            __clock_debug(group_info, new_low, 5);
             group_info->lowest_ticks=__get_clock_ticks(group_info,group_info->lowest_tid);
             group_info->nmi_new_low=0;
             group_info->notification_needed=0;
@@ -302,16 +428,15 @@ void __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_
             struct perf_event * event = group_info->clocks[group_info->lowest_tid].event;
             __wake_up_waiting_thread(event, group_info);
         }
-        //after we return from this function we'll have to call poll(), so we can set the waiting flag now
-        group_info->clocks[current->task_clock.tid].waiting=1;
     }
-
+    
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
+    //if (current->task_clock.tid==0 && __get_clock_ticks(group_info, current->task_clock.tid) > 140000){
     printk(KERN_EMERG "--------TASK CLOCK: lowest_notify_or_wait clock ticks %llu, id %d, waiting %d, lowest clock %d\n", 
            __get_clock_ticks(group_info, current->task_clock.tid), current->task_clock.tid, 
            group_info->clocks[current->task_clock.tid].waiting, current->task_clock.user_status->lowest_clock);
+    //}
 #endif
-    
     current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
 }
 
@@ -325,7 +450,7 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
 
   //update our clock in case some of the instructions weren't counted in the overflow handler
   __update_clock_ticks(group_info, current->task_clock.tid);
-  __determine_lowest_and_notify_or_wait(group_info);
+  __determine_lowest_and_notify_or_wait(group_info, 10);
 
   //am I the lowest?
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
@@ -345,7 +470,7 @@ void task_clock_add_ticks(struct task_clock_group_info * group_info, int32_t tic
   spin_lock_irqsave(&group_info->lock, flags);
   __inc_clock_ticks(group_info, current->task_clock.tid, ticks);
   current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
-  __determine_lowest_and_notify_or_wait(group_info);
+  __determine_lowest_and_notify_or_wait(group_info, 11);
 
   spin_unlock_irqrestore(&group_info->lock, flags);
 }
@@ -356,14 +481,10 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
     printk(KERN_EMERG "TASK CLOCK: ENABLING %d, lowest? %d\n", current->task_clock.tid, group_info->lowest_tid);
 #endif
-    group_info->clocks[current->task_clock.tid].inactive=0;
-    group_info->clocks[current->task_clock.tid].waiting=0;
-    group_info->clocks[current->task_clock.tid].sleeping=0;
     __reset_period(group_info);
     __update_period(group_info);
 
-
-    __determine_lowest_and_notify_or_wait(group_info);
+    __determine_lowest_and_notify_or_wait(group_info, 12);
     //are we the lowest?
     if (group_info->lowest_tid==current->task_clock.tid){
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
@@ -372,6 +493,11 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
         group_info->notification_needed=1;
         group_info->nmi_new_low=0;
     }
+
+    group_info->clocks[current->task_clock.tid].inactive=0;
+    group_info->clocks[current->task_clock.tid].waiting=0;
+    group_info->clocks[current->task_clock.tid].sleeping=0;
+
 
     getrawmonotonic(&group_info->clocks[current->task_clock.tid].debug_last_enable);
     group_info->clocks[current->task_clock.tid].debug_last_enable_ticks = __get_clock_ticks(group_info, current->task_clock.tid);
@@ -391,7 +517,7 @@ void __init_task_clock_entries(struct task_clock_group_info * group_info){
     entry->waiting=0;
     entry->sleeping=0;
     entry->inactive=0;
-    entry->ticks=(1ULL<<63);
+    entry->ticks=0;
   }
 }
 
@@ -512,9 +638,8 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
   group_info->clocks[current->task_clock.tid].inactive=0;
   group_info->clocks[current->task_clock.tid].waiting=0;
   group_info->clocks[current->task_clock.tid].sleeping=0;
-  group_info->clocks[group_info->lowest_tid].event->hw.sample_period=0;
+  __reset_period(group_info);
   __update_period(group_info);
-
   current->task_clock.user_status->notifying_id=0;
   current->task_clock.user_status->notifying_clock=666;
   current->task_clock.user_status->notifying_sample=666;
@@ -562,17 +687,25 @@ void task_clock_on_wait(struct task_clock_group_info * group_info){ }
 void task_clock_entry_wait(struct task_clock_group_info * group_info){
     unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);
-    __determine_lowest_and_notify_or_wait(group_info);
+    __determine_lowest_and_notify_or_wait(group_info, 13);
     spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
 void task_clock_entry_sleep(struct task_clock_group_info * group_info){
     unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);
-    __determine_lowest_and_notify_or_wait(group_info);
+    __determine_lowest_and_notify_or_wait(group_info, 14);
     if (group_info->clocks[current->task_clock.tid].waiting){
         group_info->clocks[current->task_clock.tid].sleeping=1;
     }
+    spin_unlock_irqrestore(&group_info->lock, flags);
+}
+
+void task_clock_entry_woke_up(struct task_clock_group_info * group_info){
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);
+    group_info->clocks[current->task_clock.tid].sleeping=0;
+    group_info->clocks[current->task_clock.tid].waiting=0;
     spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
@@ -591,6 +724,9 @@ int init_module(void)
   task_clock_func.task_clock_entry_sleep=task_clock_entry_sleep;
   task_clock_func.task_clock_overflow_update_period=task_clock_entry_overflow_update_period;
   task_clock_func.task_clock_add_ticks=task_clock_add_ticks;
+  task_clock_func.task_clock_entry_woke_up=task_clock_entry_woke_up;
+  debug_counter=0;
+  debug_counter_overflow=0;
 
   return 0;
 }
@@ -608,4 +744,10 @@ void cleanup_module(void)
   task_clock_func.task_clock_entry_activate_other=NULL;
   task_clock_func.task_clock_entry_wait=NULL;
   task_clock_func.task_clock_add_ticks=NULL;
+  task_clock_func.task_clock_entry_woke_up=NULL;
+  
+  printk(KERN_EMERG " debug counter: %d\n", debug_counter);
+
+  __clock_debug_print();
+
 }

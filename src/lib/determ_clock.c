@@ -160,13 +160,13 @@ int determ_task_clock_is_lowest_wait(){
     int polled=0;
     struct timespec t1,t2;
     
-    if (!task_clock_info.disabled){
-        if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
-            printf("\nClock wait failed\n");
-            exit(EXIT_FAILURE);
-        }
-        task_clock_info.disabled=1;
+    //if (!task_clock_info.disabled){
+    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
+        printf("\nClock wait failed\n");
+        exit(EXIT_FAILURE);
     }
+    task_clock_info.disabled=1;
+        //}
     
     clock_gettime(CLOCK_REALTIME, &t1);
     int spin_counter=0;
@@ -194,6 +194,11 @@ int determ_task_clock_is_lowest_wait(){
             polled=3;
         }
     }
+
+    /*if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WOKE_UP, 0) != 0){
+        printf("\nClock wakeup failed\n");
+        exit(EXIT_FAILURE);
+        }*/
 
     u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
     //ok, now set the debugging stuff
