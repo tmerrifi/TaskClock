@@ -748,6 +748,6 @@ void cleanup_module(void)
   
   printk(KERN_EMERG " debug counter: %d\n", debug_counter);
 
-  __clock_debug_print();
+  //__clock_debug_print();
 
 }

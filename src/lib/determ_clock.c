@@ -30,7 +30,7 @@ struct determ_task_clock_info task_clock_info;
 #define __TASK_CLOCK_SYS_CALL 342
 #endif
 
-#define MAX_SPIN_INT 1000000
+#define MAX_SPIN_INT 1000
 
 struct determ_task_clock_info determ_task_clock_get_info(){
     return task_clock_info;
@@ -142,6 +142,19 @@ u_int64_t determ_task_clock_read(){
     return task_clock_info.user_status->ticks;
 }
 
+
+void __woke_up(){
+    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WOKE_UP, 0) != 0){
+        printf("\nClock wakeup failed\n");
+        exit(EXIT_FAILURE);
+    }
+    task_clock_info.disabled=0;
+    u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
+    //ok, now set the debugging stuff
+    clock_info->event_debugging[count]=task_clock_info.tid;
+    clock_info->event_tick_debugging[count]=task_clock_info.user_status->ticks;
+}
+
 int determ_task_clock_is_lowest(){
     if (!task_clock_info.disabled){
         if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
@@ -150,8 +163,15 @@ int determ_task_clock_is_lowest(){
         }
         task_clock_info.disabled=1;
     }
-
-    return task_clock_info.user_status->lowest_clock;
+    
+    //we are the lowest clock
+    if (task_clock_info.user_status->lowest_clock){
+        __woke_up();
+        return 1;
+    }
+    else{
+        return 0;
+    }
 }
 
 //we arrive here if we're the lowest clock, else we need to poll and wait
@@ -160,13 +180,11 @@ int determ_task_clock_is_lowest_wait(){
     int polled=0;
     struct timespec t1,t2;
     
-    //if (!task_clock_info.disabled){
     if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
         printf("\nClock wait failed\n");
         exit(EXIT_FAILURE);
     }
     task_clock_info.disabled=1;
-        //}
     
     clock_gettime(CLOCK_REALTIME, &t1);
     int spin_counter=0;
@@ -195,15 +213,12 @@ int determ_task_clock_is_lowest_wait(){
         }
     }
 
-    /*if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WOKE_UP, 0) != 0){
+    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WOKE_UP, 0) != 0){
         printf("\nClock wakeup failed\n");
         exit(EXIT_FAILURE);
-        }*/
+    }
 
-    u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
-    //ok, now set the debugging stuff
-    clock_info->event_debugging[count]=task_clock_info.tid;
-    clock_info->event_tick_debugging[count]=task_clock_info.user_status->ticks;
+    __woke_up(); 
     return polled;
 }
 
