@@ -112,11 +112,15 @@ void determ_task_clock_init_with_id(u_int32_t id){
     //allocating the user status which is looked at by the kernel
     task_clock_info.user_status = &clock_info->user_status[task_clock_info.tid]; //malloc(sizeof(struct task_clock_user_status));
     memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
-    task_clock_info.disabled=1;
+    task_clock_info.disabled=0;
     //set up the task clock for our process
     __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
     //set up the performance counter
     perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter.fd, &task_clock_info.perf_counter);
+#if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
+    debug_clock_cache_init(task_clock_info.tid, &task_clock_info.debug_clock_cache);
+#endif
+
 }
 
 u_int64_t determ_debug_notifying_clock_read(){
@@ -247,8 +251,17 @@ void determ_task_clock_activate_other(int32_t id){
 
 
 void determ_task_clock_start(){
+    uint64_t diff=0;
+#ifdef DEBUG_CLOCK_CACHE_PROFILE
+    debug_clock_cache_insert(&task_clock_info.debug_clock_cache, determ_task_clock_read(), &diff);
+#elif DEBUG_CLOCK_CACHE_ON
+    debug_clock_cache_get(&task_clock_info.debug_clock_cache, determ_task_clock_read(), &diff);
+#endif
     task_clock_info.disabled=0;
     task_clock_info.user_status->lowest_clock=0;
+    if (diff>0){
+        determ_task_clock_add_ticks(diff);
+    }
     perf_counter_start(&task_clock_info.perf_counter);
 }
 
@@ -256,15 +269,27 @@ void determ_task_clock_start(){
 void determ_task_clock_stop(){
     task_clock_info.disabled=1;
     perf_counter_stop(&task_clock_info.perf_counter);
+
+#if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
+    uint64_t diff=0;
+#ifdef DEBUG_CLOCK_CACHE_PROFILE
+    debug_clock_cache_insert(&task_clock_info.debug_clock_cache, determ_task_clock_read(), &diff);
+#elif DEBUG_CLOCK_CACHE_ON
+    debug_clock_cache_get(&task_clock_info.debug_clock_cache, determ_task_clock_read(), &diff);
+#endif
+    if (diff>0){
+        determ_task_clock_add_ticks(diff);
+    }
+#endif
 }
 
 //Calling halt means that we are no longer considered as "part of the group." We can't have the lowest clock.
 void determ_task_clock_halt(){
     perf_counter_stop(&task_clock_info.perf_counter);
     if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){
-        printf("\nHalt failed\n");
         exit(EXIT_FAILURE);
     }
+
 }
 
 u_int32_t determ_task_get_id(){

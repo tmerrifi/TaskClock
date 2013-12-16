@@ -10,7 +10,8 @@
 #include <sys/types.h>
      
 #include <perf_counter.h>
-     
+
+#include <debug_clock_cache.h>     
 
 #define DETERM_CLOCK_MAX_THREADS 1024
 
@@ -31,9 +32,9 @@
        struct perf_counter_info perf_counter;
        struct task_clock_user_status * user_status;
        u_int8_t disabled;
+       struct debug_clock_cache debug_clock_cache; //cache of clock values to use (for debugging)
    };
 
-#define DETERM_CLOCK_MAX_THREADS 100
    struct determ_clock_info{
        /*volatile u_int64_t low_ticks;
          volatile u_int64_t low_tid;
