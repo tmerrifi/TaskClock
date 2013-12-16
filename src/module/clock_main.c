@@ -167,7 +167,7 @@ int32_t __search_for_lowest_waiting(struct task_clock_group_info * group_info){
 }
 
 void __debug_print(struct task_clock_group_info * group_info){
-  int i=1300;
+  int i=0;
   printk(KERN_EMERG "\n\nSEARCH FOR LOWEST....%d\n", current->task_clock.tid);
   for (;i<7;++i){
     struct task_clock_entry_info * entry = &group_info->clocks[i];
@@ -272,7 +272,6 @@ int8_t __is_sleeping(struct task_clock_group_info * group_info, int32_t tid){
 void __wake_up_waiting_thread(struct perf_event * event, struct task_clock_group_info * group_info){
   struct perf_buffer * buffer;
   if (__is_sleeping(group_info, group_info->lowest_tid)){
-      __clock_debug(group_info, group_info->lowest_tid, 69);
       rcu_read_lock();
       buffer = rcu_dereference(event->buffer);
       atomic_set(&buffer->poll, POLL_IN);
@@ -301,9 +300,7 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
   printk(KERN_EMERG "TASK CLOCK: beginning notification of %d\n", new_low);
 #endif
   if (new_low>=0 && __thread_is_waiting(group_info,new_low)){
-      //__clock_debug(group_info, new_low, 3);
       __set_new_low(group_info,new_low);
-      //__clock_debug(group_info, new_low, 4);
       if (group_info->notification_needed || group_info->nmi_new_low){
           group_info->nmi_new_low=0;
           group_info->notification_needed=0;
@@ -369,10 +366,6 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   int32_t new_low=-1;
 
   spin_lock_irqsave(&group_info->nmi_lock, flags);
-  if (__thread_is_waiting(group_info, current->task_clock.tid)){
-      __clock_debug_overflow(group_info, 0, 10);
-  }
-  current->task_clock.user_status->notifying_id++;
   new_low=__new_lowest(group_info, current->task_clock.tid);
   if (new_low >= 0 && new_low != current->task_clock.tid && group_info->nmi_new_low==0){
       group_info->nmi_new_low=1;
@@ -388,7 +381,7 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
           //we use this opportunity to set the lowest threads flag...this way, if its spinning right now
           //it can wake up immediately. 
           //group_info->user_status_arr[new_low].lowest_clock=1;
-          __debug_token_wakeup(group_info);
+          //__debug_token_wakeup(group_info);
           //schedule work to be done when we are not in NMI context
           irq_work_queue(&group_info->pending_work);
       }
@@ -402,15 +395,12 @@ void __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_
     
     group_info->clocks[current->task_clock.tid].waiting=1;
     int32_t new_low=__search_for_lowest_waiting(group_info);    
-    __clock_debug(group_info, new_low, (user_event) ? user_event : 7);
     if (new_low!=group_info->lowest_tid){
         group_info->notification_needed=1;
         group_info->lowest_tid=new_low;
     }
-
     
     if (new_low >= 0 && group_info->lowest_tid == current->task_clock.tid){
-        __clock_debug(group_info, new_low, 1);
         current->task_clock.user_status->lowest_clock=1;
         group_info->notification_needed=0;
         group_info->clocks[current->task_clock.tid].waiting=0;
@@ -420,7 +410,6 @@ void __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_
     else{
         current->task_clock.user_status->lowest_clock=0;
         if (__thread_is_waiting(group_info, group_info->lowest_tid) && group_info->notification_needed){
-            __clock_debug(group_info, new_low, 5);
             group_info->lowest_ticks=__get_clock_ticks(group_info,group_info->lowest_tid);
             group_info->nmi_new_low=0;
             group_info->notification_needed=0;
