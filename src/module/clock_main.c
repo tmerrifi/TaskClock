@@ -33,6 +33,7 @@ struct clock_debug{
     int event;
     int current_is_lowest;
     int current_id;
+    uint64_t sample_rate;
 };
 
 #define clock_debug_max_entries 2500
@@ -191,7 +192,7 @@ void __clock_debug(struct task_clock_group_info * group_info, int new_low, int e
         clock_debug[debug_counter].event = event;
         clock_debug[debug_counter].current_id = current->task_clock.tid;
         clock_debug[debug_counter].current_is_lowest = group_info->user_status_arr[current->task_clock.tid].lowest_clock;
-        
+        clock_debug[debug_counter].sample_rate = group_info->clocks[current->task_clock.tid].event->hw.sample_period;
         ++debug_counter;
     }
 }
@@ -210,8 +211,22 @@ void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_l
         clock_debug_overflow[debug_counter_overflow].lowest_clock = group_info->lowest_ticks;
         clock_debug_overflow[debug_counter_overflow].event = event;
         clock_debug_overflow[debug_counter_overflow].current_id = current->task_clock.tid;
+        clock_debug_overflow[debug_counter].sample_rate = group_info->clocks[current->task_clock.tid].event->hw.sample_period;
         ++debug_counter_overflow;
     }
+}
+
+
+void task_clock_debug_add_event(struct task_clock_group_info * group_info, int32_t event){
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);
+
+    if (current->task_clock.tid==2 
+        && __get_clock_ticks(group_info,current->task_clock.tid) > 1940045901LL 
+        && __get_clock_ticks(group_info,current->task_clock.tid) < 1960045901LL){
+        __clock_debug_overflow(group_info, 0, event);
+    }
+    spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
 void __clock_debug_print(){
@@ -222,8 +237,10 @@ void __clock_debug_print(){
             printk(KERN_EMERG " id: %d clock: %lu computed %lu initialized %d sleeping %d\n", 
                    j, clock_debug[i].clocks[j], clock_debug[i].clocks_computed[j], clock_debug[i].initialized[j], clock_debug[i].sleeping[j]);
         }
-        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d, current_marked_lowest: %d", 
-               clock_debug[i].new_low, clock_debug[i].new_low_computed, clock_debug[i].lowest_clock, clock_debug[i].event, clock_debug[i].current_id, clock_debug[i].current_is_lowest);
+        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d, current_marked_lowest: %d sample: %lu", 
+               clock_debug[i].new_low, clock_debug[i].new_low_computed, 
+               clock_debug[i].lowest_clock, clock_debug[i].event, 
+               clock_debug[i].current_id, clock_debug[i].current_is_lowest, clock_debug[i].sample_rate);
     }
 }
 
@@ -234,8 +251,10 @@ void __clock_debug_print_overflow(){
         for (;j<5;++j){
             printk(KERN_EMERG " id: %d clock: %lu computed %lu initialized %d\n", j, clock_debug_overflow[i].clocks[j], clock_debug_overflow[i].clocks_computed[j], clock_debug_overflow[i].initialized[j]);
         }
-        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d", 
-               clock_debug_overflow[i].new_low, clock_debug_overflow[i].new_low_computed, clock_debug_overflow[i].lowest_clock, clock_debug_overflow[i].event, clock_debug_overflow[i].current_id);
+        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d, sample: %lu", 
+               clock_debug_overflow[i].new_low, clock_debug_overflow[i].new_low_computed, 
+               clock_debug_overflow[i].lowest_clock, clock_debug_overflow[i].event, 
+               clock_debug_overflow[i].current_id, clock_debug_overflow[i].sample_rate);
     }
 }
 
@@ -343,9 +362,13 @@ void task_clock_entry_overflow_update_period(struct task_clock_group_info * grou
     unsigned long flags;
 
     spin_lock_irqsave(&group_info->nmi_lock, flags);
+
+    task_clock_debug_add_event(group_info, 666);
+
     __update_clock_ticks(group_info, current->task_clock.tid);
     __update_period(group_info);
     spin_unlock_irqrestore(&group_info->nmi_lock, flags);
+
 }
 
 __debug_token_wakeup(struct task_clock_group_info * group_info){
@@ -367,6 +390,9 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
 
   spin_lock_irqsave(&group_info->nmi_lock, flags);
   new_low=__new_lowest(group_info, current->task_clock.tid);
+  
+  task_clock_debug_add_event(group_info, 333);
+
   if (new_low >= 0 && new_low != current->task_clock.tid && group_info->nmi_new_low==0){
       group_info->nmi_new_low=1;
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
@@ -493,8 +519,10 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
     
     //GET RID OF THIS
     current->task_clock.user_status->notifying_id=0;
-
     spin_unlock_irqrestore(&group_info->lock, flags);
+
+
+
 
 }
 
@@ -714,6 +742,8 @@ int init_module(void)
   task_clock_func.task_clock_overflow_update_period=task_clock_entry_overflow_update_period;
   task_clock_func.task_clock_add_ticks=task_clock_add_ticks;
   task_clock_func.task_clock_entry_woke_up=task_clock_entry_woke_up;
+  task_clock_func.task_clock_debug_add_event=task_clock_debug_add_event;
+
   debug_counter=0;
   debug_counter_overflow=0;
 
@@ -734,9 +764,10 @@ void cleanup_module(void)
   task_clock_func.task_clock_entry_wait=NULL;
   task_clock_func.task_clock_add_ticks=NULL;
   task_clock_func.task_clock_entry_woke_up=NULL;
-  
+  task_clock_func.task_clock_debug_add_event=NULL;  
+
   printk(KERN_EMERG " debug counter: %d\n", debug_counter);
 
-  //__clock_debug_print();
+  //__clock_debug_print_overflow();
 
 }
