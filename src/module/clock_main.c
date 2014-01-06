@@ -27,6 +27,8 @@ struct clock_debug{
     uint64_t clocks_computed[5];
     uint64_t initialized[5];
     uint64_t sleeping[5];
+    uint64_t inactive[5];
+    uint64_t waiting[5];
     int new_low;
     int new_low_computed;
     uint64_t lowest_clock;
@@ -185,6 +187,7 @@ void __clock_debug(struct task_clock_group_info * group_info, int new_low, int e
             clock_debug[debug_counter].clocks_computed[i]=__get_clock_ticks(group_info, i) - group_info->lowest_ticks;
             clock_debug[debug_counter].sleeping[i]=group_info->clocks[i].sleeping;
             clock_debug[debug_counter].initialized[i]=group_info->clocks[i].initialized;
+            clock_debug[debug_counter].inactive[i]=group_info->clocks[i].inactive;
         }
         clock_debug[debug_counter].new_low = new_low;
         clock_debug[debug_counter].new_low_computed = __search_for_lowest_waiting(group_info);
@@ -205,6 +208,9 @@ void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_l
             clock_debug_overflow[debug_counter_overflow].clocks[i]=__get_clock_ticks(group_info, i);
             clock_debug_overflow[debug_counter_overflow].clocks_computed[i]=__get_clock_ticks(group_info, i) - group_info->lowest_ticks;
             clock_debug_overflow[debug_counter_overflow].initialized[i]=group_info->clocks[i].initialized;
+            clock_debug_overflow[debug_counter_overflow].inactive[i]=group_info->clocks[i].inactive;
+            clock_debug_overflow[debug_counter_overflow].waiting[i]=group_info->clocks[i].waiting;
+
         }
         clock_debug_overflow[debug_counter_overflow].new_low = new_low;
         clock_debug_overflow[debug_counter_overflow].new_low_computed = __search_for_lowest_waiting(group_info);
@@ -220,12 +226,7 @@ void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_l
 void task_clock_debug_add_event(struct task_clock_group_info * group_info, int32_t event){
     unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);
-
-    if (current->task_clock.tid==2 
-        && __get_clock_ticks(group_info,current->task_clock.tid) > 1940045901LL 
-        && __get_clock_ticks(group_info,current->task_clock.tid) < 1960045901LL){
-        __clock_debug_overflow(group_info, 0, event);
-    }
+    __clock_debug_overflow(group_info, 0, event);
     spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
@@ -249,7 +250,9 @@ void __clock_debug_print_overflow(){
     for (;i<debug_counter_overflow;++i){
         int j=0;
         for (;j<5;++j){
-            printk(KERN_EMERG " id: %d clock: %lu computed %lu initialized %d\n", j, clock_debug_overflow[i].clocks[j], clock_debug_overflow[i].clocks_computed[j], clock_debug_overflow[i].initialized[j]);
+            printk(KERN_EMERG " id: %d clock: %lu computed %lu initialized %d inactive %d waiting %d\n", 
+                   j, clock_debug_overflow[i].clocks[j], clock_debug_overflow[i].clocks_computed[j], 
+                   clock_debug_overflow[i].initialized[j], clock_debug_overflow[i].inactive[j], clock_debug_overflow[i].waiting[j]);
         }
         printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d, sample: %lu", 
                clock_debug_overflow[i].new_low, clock_debug_overflow[i].new_low_computed, 
@@ -682,16 +685,9 @@ void task_clock_entry_activate_other(struct task_clock_group_info * group_info, 
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
     printk(KERN_EMERG "TASK CLOCK: activating_other %d activating %d\n", current->task_clock.tid, id);
 #endif
-    if (group_info->clocks[id].initialized==0){
-        //this is activating a new thread...so it needs to inherit the activating parent's clock + 1
-        group_info->clocks[id].initialized=1;
-        group_info->clocks[id].ticks=0;
-        group_info->clocks[id].base_ticks=__get_clock_ticks(group_info, current->task_clock.tid) + 1;
-        #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
-        printk(KERN_EMERG "--------TASK CLOCK: Thread %d is setting thread %d's clock to %llu\n", 
-               current->task_clock.tid, id, __get_clock_ticks(group_info, current->task_clock.tid));
-        #endif
-    }
+    group_info->clocks[id].initialized=1;
+    group_info->clocks[id].ticks=0;
+    group_info->clocks[id].base_ticks=__get_clock_ticks(group_info, current->task_clock.tid) + 1;
     group_info->clocks[id].inactive=0;
     group_info->clocks[id].waiting=0;
     group_info->clocks[id].sleeping=0;
