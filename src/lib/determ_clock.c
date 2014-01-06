@@ -178,6 +178,11 @@ int determ_task_clock_is_lowest(){
     }
 }
 
+//need to call this to make sure we mark ourselves as "waiting"
+void determ_task_clock_on_wakeup(){
+    task_clock_info.disabled=0;
+}
+
 //we arrive here if we're the lowest clock, else we need to poll and wait
 int determ_task_clock_is_lowest_wait(){
     //are we the lowest? If we are, no reason to wait around
@@ -248,7 +253,6 @@ void determ_task_clock_activate_other(int32_t id){
     exit(EXIT_FAILURE);
   }
 }
-
 
 void determ_task_clock_start(){
     uint64_t diff=0;
