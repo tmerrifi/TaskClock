@@ -156,8 +156,8 @@ void __woke_up(){
     task_clock_info.disabled=0;
     u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
     //ok, now set the debugging stuff
-    clock_info->event_debugging[count]=task_clock_info.tid;
-    clock_info->event_tick_debugging[count]=task_clock_info.user_status->ticks;
+    //clock_info->event_debugging[count]=task_clock_info.tid;
+    //clock_info->event_tick_debugging[count]=task_clock_info.user_status->ticks;
 }
 
 int determ_task_clock_is_lowest(){
@@ -301,9 +301,4 @@ u_int32_t determ_task_get_id(){
   return task_clock_info.tid;
 }
 
-void determ_debugging_print_event(){
-  int i=0;
-  for (;i<clock_info->current_event_count;++i){
-      printf("%d: %llu %llu\n", i, clock_info->event_debugging[i], clock_info->event_tick_debugging[i]);
-  }
-}
+void determ_debugging_print_event(){}

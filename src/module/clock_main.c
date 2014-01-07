@@ -224,10 +224,10 @@ void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_l
 
 
 void task_clock_debug_add_event(struct task_clock_group_info * group_info, int32_t event){
-    unsigned long flags;
+    /*unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);
     __clock_debug_overflow(group_info, 0, event);
-    spin_unlock_irqrestore(&group_info->lock, flags);
+    spin_unlock_irqrestore(&group_info->lock, flags);*/
 }
 
 void __clock_debug_print(){
@@ -461,10 +461,8 @@ void __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_
 //userspace is disabling the clock. Perhaps they are about to start waiting to be named the lowest. In that
 //case, we need to figure out if they are the lowest and let them know before they call poll
 void task_clock_on_disable(struct task_clock_group_info * group_info){
-  unsigned long flags;
-
   //TODO: Why are we disabling interrupts here?
-  spin_lock_irqsave(&group_info->lock, flags);
+  spin_lock(&group_info->lock);
 
   //update our clock in case some of the instructions weren't counted in the overflow handler
   __update_clock_ticks(group_info, current->task_clock.tid);
@@ -477,20 +475,17 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
 #endif
   
   getrawmonotonic(&group_info->clocks[current->task_clock.tid].debug_last_disable);
-
-  spin_unlock_irqrestore(&group_info->lock, flags);
+  spin_unlock(&group_info->lock);
 }
 
 void task_clock_add_ticks(struct task_clock_group_info * group_info, int32_t ticks){
-    unsigned long flags;
-
   //TODO: Why are we disabling interrupts here?
-  spin_lock_irqsave(&group_info->lock, flags);
+  spin_lock(&group_info->lock);
   __inc_clock_ticks(group_info, current->task_clock.tid, ticks);
   current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
   __determine_lowest_and_notify_or_wait(group_info, 11);
 
-  spin_unlock_irqrestore(&group_info->lock, flags);
+  spin_unlock(&group_info->lock);
 }
 
 void task_clock_on_enable(struct task_clock_group_info * group_info){
@@ -698,28 +693,25 @@ void task_clock_entry_activate_other(struct task_clock_group_info * group_info, 
 void task_clock_on_wait(struct task_clock_group_info * group_info){ }
 
 void task_clock_entry_wait(struct task_clock_group_info * group_info){
-    unsigned long flags;
-    spin_lock_irqsave(&group_info->lock, flags);
+    spin_lock(&group_info->lock);
     __determine_lowest_and_notify_or_wait(group_info, 13);
-    spin_unlock_irqrestore(&group_info->lock, flags);
+    spin_unlock(&group_info->lock);
 }
 
 void task_clock_entry_sleep(struct task_clock_group_info * group_info){
-    unsigned long flags;
-    spin_lock_irqsave(&group_info->lock, flags);
+    spin_lock(&group_info->lock);
     __determine_lowest_and_notify_or_wait(group_info, 14);
     if (group_info->clocks[current->task_clock.tid].waiting){
         group_info->clocks[current->task_clock.tid].sleeping=1;
     }
-    spin_unlock_irqrestore(&group_info->lock, flags);
+    spin_unlock(&group_info->lock);
 }
 
 void task_clock_entry_woke_up(struct task_clock_group_info * group_info){
-    unsigned long flags;
-    spin_lock_irqsave(&group_info->lock, flags);
+    spin_lock(&group_info->lock);
     group_info->clocks[current->task_clock.tid].sleeping=0;
     group_info->clocks[current->task_clock.tid].waiting=0;
-    spin_unlock_irqrestore(&group_info->lock, flags);
+    spin_unlock(&group_info->lock);
 }
 
 int init_module(void)
