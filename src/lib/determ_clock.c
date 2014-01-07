@@ -75,6 +75,7 @@ void * __open_shared_mem(){
     perror("mmap failed in determ_clock.c");
     exit(1);
   }
+  mlock(mem, sizeof(struct determ_clock_info));
   return mem;
 }
 
