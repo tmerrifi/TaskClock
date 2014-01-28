@@ -15,10 +15,11 @@
    #define PERF_MAGIC_NUMBER 0xDEAD
 
    struct perf_counter_info{
-     pid_t pid;
-     int fd;
-     void * ring_buffer;
-     void * ring_buffer_current; //where are we pointing at right now in the ring buffer
+       pid_t pid;
+       int fd;
+       void * ring_buffer;
+       void * ring_buffer_current; //where are we pointing at right now in the ring buffer
+       int started;
    };
 
    struct perf_mmap_sample{

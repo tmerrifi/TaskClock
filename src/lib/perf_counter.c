@@ -70,6 +70,7 @@ void perf_counter_init(u_int32_t sample_period, int32_t group_fd, struct perf_co
   pci->fd=fd;
   pci->ring_buffer_current=ring_buffer+PAGE_SIZE;
   pci->ring_buffer=ring_buffer;
+  pci->started=0;
 }
 
 void perf_counter_start(struct perf_counter_info * pci){
@@ -83,6 +84,7 @@ void perf_counter_start(struct perf_counter_info * pci){
     printf("\nenable wrong\n");
     exit(EXIT_FAILURE);
   }
+  pci->started=1;
 }
 
 void perf_counter_stop(struct perf_counter_info * pci){
@@ -90,6 +92,7 @@ void perf_counter_stop(struct perf_counter_info * pci){
     printf("\ndisable wrong\n");
     exit(EXIT_FAILURE);
   }
+  pci->started=0;
 }
 
 

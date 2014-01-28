@@ -160,6 +160,10 @@ void __woke_up(){
     //clock_info->event_tick_debugging[count]=task_clock_info.user_status->ticks;
 }
 
+int determ_debugging_is_disabled(){
+    return task_clock_info.disabled;
+}
+
 int determ_task_clock_is_lowest(){
     if (!task_clock_info.disabled){
         if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
@@ -190,6 +194,7 @@ int determ_task_clock_is_lowest_wait(){
     int polled=0;
     struct timespec t1,t2;
     
+    polled=task_clock_info.disabled;
     if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
         printf("\nClock wait failed\n");
         exit(EXIT_FAILURE);
@@ -202,7 +207,6 @@ int determ_task_clock_is_lowest_wait(){
         ++spin_counter;
     }
     clock_gettime(CLOCK_REALTIME, &t2);
-    polled=time_util_time_diff(&t1, &t2);
 
     if (!task_clock_info.user_status->lowest_clock){
         if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_SLEEP, 0) != 0){
@@ -216,10 +220,6 @@ int determ_task_clock_is_lowest_wait(){
             fds.fd = task_clock_info.perf_counter.fd;
             fds.events = POLLIN;
             poll(&fds, 1, -1);
-            polled=2;
-        }
-        else{
-            polled=3;
         }
     }
 
@@ -267,13 +267,26 @@ void determ_task_clock_start(){
     if (diff>0){
         determ_task_clock_add_ticks(diff);
     }
-    perf_counter_start(&task_clock_info.perf_counter);
+    
+    if (!task_clock_info.perf_counter.started){
+        perf_counter_start(&task_clock_info.perf_counter);
+    }
+    else{
+        if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_START) != 0){
+            printf("\nClock read failed\n");
+            exit(EXIT_FAILURE);
+        }
+    }
 }
 
-//No longer counting, but still can be named "lowest" clock
 void determ_task_clock_stop(){
-    task_clock_info.disabled=1;
-    perf_counter_stop(&task_clock_info.perf_counter);
+
+    //read the clock
+    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_STOP) != 0){
+        printf("\nClock read failed\n");
+        exit(EXIT_FAILURE);
+    }
+    //perf_counter_stop(&task_clock_info.perf_counter);
 
 #if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
     uint64_t diff=0;
@@ -291,6 +304,7 @@ void determ_task_clock_stop(){
 //Calling halt means that we are no longer considered as "part of the group." We can't have the lowest clock.
 void determ_task_clock_halt(){
     perf_counter_stop(&task_clock_info.perf_counter);
+    task_clock_info.disabled=1;
     if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_HALT, 0) != 0){
         exit(EXIT_FAILURE);
     }

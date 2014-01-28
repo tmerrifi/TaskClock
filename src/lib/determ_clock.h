@@ -25,6 +25,7 @@
        u_int64_t notifying_id;
        u_int64_t notifying_sample;
        u_int64_t notifying_diff;
+       u_int8_t single_active_thread;
    } __attribute__ ((aligned (8), packed));
 
    struct determ_task_clock_info{
@@ -77,6 +78,7 @@
      void determ_task_clock_add_ticks(int32_t ticks);
      void determ_task_clock_on_wakeup();
      void determ_debugging_print_event();
+     int determ_debugging_is_disabled();
      u_int32_t determ_task_get_id();
      struct determ_task_clock_info determ_task_clock_get_info();
 #endif
