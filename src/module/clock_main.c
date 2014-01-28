@@ -532,7 +532,9 @@ int __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_i
 //case, we need to figure out if they are the lowest and let them know before they call poll
 void task_clock_on_disable(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
-    spin_lock(&group_info->lock);
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);
+
     //turn the counter off...not that it matters since the "real" perf-counter is off
     __tick_counter_turn_off(group_info);
     //update our clock in case some of the instructions weren't counted in the overflow handler
@@ -543,7 +545,7 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
     printk(KERN_EMERG "TASK CLOCK: disabling %d...lowest is %d lowest clock is %d pid %d\n", 
            current->task_clock.tid, group_info->lowest_tid, current->task_clock.user_status->lowest_clock, current->pid);
 #endif
-    spin_unlock(&group_info->lock);
+    spin_unlock_irqrestore(&group_info->lock, flags);
     if (lowest_tid>=0){
         __wake_up_waiting_thread(group_info, lowest_tid);
     }
@@ -553,11 +555,13 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
 void task_clock_add_ticks(struct task_clock_group_info * group_info, int32_t ticks){
     int lowest_tid=-1;
     //TODO: Why are we disabling interrupts here?
-    spin_lock(&group_info->lock);
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);
+
     __inc_clock_ticks(group_info, current->task_clock.tid, ticks);
     current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 11);
-    spin_unlock(&group_info->lock);
+    spin_unlock_irqrestore(&group_info->lock, flags);
     if (lowest_tid>=0){
         __wake_up_waiting_thread(group_info, lowest_tid);
     }
@@ -566,7 +570,9 @@ void task_clock_add_ticks(struct task_clock_group_info * group_info, int32_t tic
 
 void task_clock_on_enable(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
-    spin_lock(&group_info->lock);
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);
+
     //turn the counter back on...next overflow will actually be counted
     __tick_counter_turn_on(group_info);
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
@@ -585,7 +591,7 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
         group_info->nmi_new_low=0;
     }
     __clear_entry_state(group_info);
-    spin_unlock(&group_info->lock );
+    spin_unlock_irqrestore(&group_info->lock, flags);
     if (lowest_tid>=0){           
         __wake_up_waiting_thread(group_info, lowest_tid);
     }
@@ -685,7 +691,9 @@ struct task_clock_group_info * task_clock_group_init(void){
 void task_clock_entry_halt(struct task_clock_group_info * group_info){
   int32_t new_low=-1;
   //first, check if we're the lowest
-  spin_lock(&group_info->lock);
+  unsigned long flags;
+  spin_lock_irqsave(&group_info->lock, flags);
+
   //make us inactive
 
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
@@ -711,14 +719,15 @@ void task_clock_entry_halt(struct task_clock_group_info * group_info){
           irq_work_queue(&group_info->pending_work);
       }
   }
-  spin_unlock(&group_info->lock);
+  spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
 void task_clock_entry_activate(struct task_clock_group_info * group_info){
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
   printk(KERN_EMERG "TASK CLOCK: activating %d\n", current->task_clock.tid);
 #endif
-  spin_lock(&group_info->lock);
+  unsigned long flags;
+  spin_lock_irqsave(&group_info->lock, flags);
   __set_base_ticks(group_info, current->task_clock.tid,group_info->lowest_ticks);
   __clear_entry_state(group_info);
   __mark_as_active(group_info, __current_tid());
@@ -739,7 +748,7 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
       current->task_clock.user_status->lowest_clock=1;
 
   }
-  spin_unlock(&group_info->lock);
+  spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
 void task_clock_entry_activate_other(struct task_clock_group_info * group_info, int32_t id){
@@ -762,13 +771,15 @@ void task_clock_on_wait(struct task_clock_group_info * group_info){ }
 
 void task_clock_entry_wait(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
-    spin_lock(&group_info->lock);
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);
+
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 13);
     /*if (__current_tid()>0 && __get_clock_ticks(group_info, __current_tid()) > 5607249783 && __get_clock_ticks(group_info, __current_tid()) < 6707249783 ){
         printk(KERN_EMERG "WAITING for %d\n", __current_tid());
       __debug_print(group_info);
       }*/
-    spin_unlock(&group_info->lock);
+    spin_unlock_irqrestore(&group_info->lock, flags);
     if (lowest_tid>=0){
         __wake_up_waiting_thread(group_info, lowest_tid);
     }
@@ -777,7 +788,8 @@ void task_clock_entry_wait(struct task_clock_group_info * group_info){
 
 void task_clock_entry_sleep(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
-    spin_lock(&group_info->lock);
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 14);
     if (group_info->clocks[current->task_clock.tid].waiting){
         group_info->clocks[current->task_clock.tid].sleeping=1;
@@ -788,7 +800,7 @@ void task_clock_entry_sleep(struct task_clock_group_info * group_info){
       __debug_print(group_info);
       }*/
     
-    spin_unlock(&group_info->lock);
+    spin_unlock_irqrestore(&group_info->lock, flags);
     if (lowest_tid>=0){
         __wake_up_waiting_thread(group_info, lowest_tid);
     }
@@ -796,10 +808,11 @@ void task_clock_entry_sleep(struct task_clock_group_info * group_info){
 }
 
 void task_clock_entry_woke_up(struct task_clock_group_info * group_info){
-    spin_lock(&group_info->lock);
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);    
     group_info->clocks[current->task_clock.tid].sleeping=0;
     group_info->clocks[current->task_clock.tid].waiting=0;
-    spin_unlock(&group_info->lock);
+    spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
 //utility function to read the performance counter
@@ -841,9 +854,11 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
     //let userspace see it
     current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
     
-    spin_lock(&group_info->lock);
+    unsigned long flags;
+    spin_lock_irqsave(&group_info->lock, flags);
+
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 787);
-    spin_unlock(&group_info->lock);
+    spin_unlock_irqrestore(&group_info->lock, flags);
 
     if (lowest_tid>=0){
         __wake_up_waiting_thread(group_info, lowest_tid);
