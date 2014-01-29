@@ -77,6 +77,7 @@
      void determ_task_clock_activate_other(int32_t id);
      void determ_task_clock_add_ticks(int32_t ticks);
      void determ_task_clock_on_wakeup();
+     int determ_task_clock_single_active_thread();
      void determ_debugging_print_event();
      int determ_debugging_is_disabled();
      u_int32_t determ_task_get_id();

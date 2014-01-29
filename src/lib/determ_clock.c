@@ -124,6 +124,10 @@ void determ_task_clock_init_with_id(u_int32_t id){
 
 }
 
+int determ_task_clock_single_active_thread(){
+    return task_clock_info.user_status->single_active_thread;
+}
+
 u_int64_t determ_debug_notifying_clock_read(){
     return task_clock_info.user_status->notifying_clock;
 }
@@ -249,10 +253,11 @@ void determ_task_clock_add_ticks(int32_t ticks){
 }
 
 void determ_task_clock_activate_other(int32_t id){
-  if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE_OTHER, id) != 0){
-    printf("\nClock start failed\n");
-    exit(EXIT_FAILURE);
-  }
+    task_clock_info.user_status->single_active_thread=0;
+    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE_OTHER, id) != 0){
+        printf("\nClock start failed\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void determ_task_clock_start(){
