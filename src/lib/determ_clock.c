@@ -253,6 +253,7 @@ void determ_task_clock_add_ticks(int32_t ticks){
 }
 
 void determ_task_clock_activate_other(int32_t id){
+    //the only way this flag could change is when we activate others, which happnes on create and cond_signal
     task_clock_info.user_status->single_active_thread=0;
     if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE_OTHER, id) != 0){
         printf("\nClock start failed\n");
