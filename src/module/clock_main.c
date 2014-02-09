@@ -21,17 +21,19 @@
 
 MODULE_LICENSE("GPL");
 
-#define MAX_CLOCK_SAMPLE_PERIOD 50000
+#define MAX_CLOCK_SAMPLE_PERIOD 200000
 
 #define MIN_CLOCK_SAMPLE_PERIOD 1024
 
+#define DEBUG_THREAD_COUNT 10
+
 struct clock_debug{
-    uint64_t clocks[5];
-    uint64_t clocks_computed[5];
-    uint64_t initialized[5];
-    uint64_t sleeping[5];
-    uint64_t inactive[5];
-    uint64_t waiting[5];
+    uint64_t clocks[DEBUG_THREAD_COUNT];
+    uint64_t clocks_computed[DEBUG_THREAD_COUNT];
+    uint64_t initialized[DEBUG_THREAD_COUNT];
+    uint64_t sleeping[DEBUG_THREAD_COUNT];
+    uint64_t inactive[DEBUG_THREAD_COUNT];
+    uint64_t waiting[DEBUG_THREAD_COUNT];
     int new_low;
     int new_low_computed;
     uint64_t lowest_clock;
@@ -40,6 +42,7 @@ struct clock_debug{
     int current_id;
     uint64_t sample_rate;
     uint64_t prev_count;
+    int nmi_new_low;
 };
 
 #define clock_debug_max_entries 2500
@@ -227,7 +230,7 @@ void __clock_debug(struct task_clock_group_info * group_info, int new_low, int e
 
     if (debug_counter < clock_debug_max_entries){
         int i=0;
-        for (;i<5;++i){
+        for (;i<DEBUG_THREAD_COUNT;++i){
             clock_debug[debug_counter].clocks[i]=__get_clock_ticks(group_info, i);
             clock_debug[debug_counter].clocks_computed[i]=__get_clock_ticks(group_info, i) - group_info->lowest_ticks;
             clock_debug[debug_counter].sleeping[i]=group_info->clocks[i].sleeping;
@@ -251,7 +254,7 @@ void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_l
     struct hw_perf_event * hwc = &group_info->clocks[current->task_clock.tid].event->hw;
     if (debug_counter_overflow < clock_debug_max_entries){
         int i=0;
-        for (;i<5;++i){
+        for (;i<DEBUG_THREAD_COUNT;++i){
             clock_debug_overflow[debug_counter_overflow].clocks[i]=__get_clock_ticks(group_info, i);
             clock_debug_overflow[debug_counter_overflow].clocks_computed[i]=__get_clock_ticks(group_info, i) - group_info->lowest_ticks;
             clock_debug_overflow[debug_counter_overflow].initialized[i]=group_info->clocks[i].initialized;
@@ -267,22 +270,21 @@ void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_l
         clock_debug_overflow[debug_counter_overflow].sample_rate = group_info->clocks[current->task_clock.tid].event->hw.sample_period;
         clock_debug_overflow[debug_counter_overflow].prev_count =  
             local64_read(&group_info->clocks[__current_tid()].event->count);  //local64_read(&hwc->prev_count);
+        clock_debug_overflow[debug_counter_overflow].nmi_new_low=group_info->nmi_new_low;
         ++debug_counter_overflow;
     }
 }
 
 
 void task_clock_debug_add_event(struct task_clock_group_info * group_info, int32_t event){
-    //if (current->pid % 8 == 2){
     __clock_debug_overflow(group_info, 0, event);
-    //}
 }
 
 void __clock_debug_print(void){
     int i=300;
     for (;i<debug_counter;++i){
         int j=0;
-        for (;j<5;++j){
+        for (;j<DEBUG_THREAD_COUNT;++j){
             printk(KERN_EMERG " id: %d clock: %lu computed %lu initialized %d sleeping %d\n", 
                    j, clock_debug[i].clocks[j], clock_debug[i].clocks_computed[j], clock_debug[i].initialized[j], clock_debug[i].sleeping[j]);
         }
@@ -297,17 +299,17 @@ void __clock_debug_print_overflow(void){
     int i=0;
     for (;i<debug_counter_overflow;++i){
         int j=0;
-        for (;j<5;++j){
+        for (;j<DEBUG_THREAD_COUNT;++j){
             printk(KERN_EMERG " id: %d clock: %lu computed %lu initialized %d inactive %d waiting %d\n", 
                    j, clock_debug_overflow[i].clocks[j], clock_debug_overflow[i].clocks_computed[j], 
                    clock_debug_overflow[i].initialized[j], clock_debug_overflow[i].inactive[j], 
                    clock_debug_overflow[i].waiting[j]);
         }
-        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d, sample: %lu, prev_count: %lu", 
+        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d, sample: %lu, prev_count: %lu, nmi_new_low: %d", 
                clock_debug_overflow[i].new_low, clock_debug_overflow[i].new_low_computed, 
                clock_debug_overflow[i].lowest_clock, clock_debug_overflow[i].event, 
                clock_debug_overflow[i].current_id, clock_debug_overflow[i].sample_rate,
-               clock_debug_overflow[i].prev_count);
+               clock_debug_overflow[i].prev_count, clock_debug_overflow[i].nmi_new_low);
     }
 }
 
@@ -418,7 +420,6 @@ void __reset_period(struct task_clock_group_info * group_info){
 void task_clock_entry_overflow_update_period(struct task_clock_group_info * group_info){
     unsigned long flags;
 
-    //task_clock_debug_add_event(group_info, 666);
     //if we don't want to count ticks...don't do any of this work.
     if (!__tick_counter_is_running(group_info)){
         return;
@@ -448,15 +449,13 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   spin_lock_irqsave(&group_info->nmi_lock, flags);
   new_low=__new_lowest(group_info, current->task_clock.tid);
   
-  //task_clock_debug_add_event(group_info, 333);
-
   if (new_low >= 0 && new_low != current->task_clock.tid && group_info->nmi_new_low==0){
-      group_info->nmi_new_low=1;
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
       printk(KERN_EMERG "TASK CLOCK: new low %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
 #endif
       //there is a new lowest thread, make sure to set it
       if (__thread_is_waiting(group_info, new_low)){
+          group_info->nmi_new_low=1;
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
           printk(KERN_EMERG "----TASK CLOCK: notifying %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
 #endif
@@ -487,6 +486,7 @@ int __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_i
     //if we're the only active thread, do our work and get out
     if (__current_is_only_active_thread(group_info)){
         //set it as a single active thread
+        task_clock_debug_add_event(group_info, 6969);
         current->task_clock.user_status->single_active_thread=1;
         __set_current_thread_to_lowest(group_info);
     }
@@ -685,6 +685,7 @@ struct task_clock_group_info * task_clock_group_init(void){
   listarray_init(group_info->active_threads);
   __init_task_clock_entries(group_info);
   init_irq_work(&group_info->pending_work, __task_clock_notify_waiting_threads);
+  debug_counter_overflow=0;
   return group_info;
 }
 
@@ -699,9 +700,10 @@ void task_clock_entry_halt(struct task_clock_group_info * group_info){
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
   printk(KERN_EMERG "TASK CLOCK: halting %d\n", __current_tid());
 #endif
+  
+  task_clock_debug_add_event(group_info, 80085);
 
   __mark_as_inactive(group_info, __current_tid());
-
   //are we the lowest?
   if (group_info->lowest_tid==current->task_clock.tid || group_info->lowest_tid==-1){
 
@@ -730,6 +732,7 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
   spin_lock_irqsave(&group_info->lock, flags);
   __set_base_ticks(group_info, current->task_clock.tid,group_info->lowest_ticks);
   __clear_entry_state(group_info);
+  task_clock_debug_add_event(group_info, 1234);
   __mark_as_active(group_info, __current_tid());
   __reset_period(group_info);
   __update_period(group_info);
@@ -775,10 +778,6 @@ void task_clock_entry_wait(struct task_clock_group_info * group_info){
     spin_lock_irqsave(&group_info->lock, flags);
 
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 13);
-    /*if (__current_tid()>0 && __get_clock_ticks(group_info, __current_tid()) > 5607249783 && __get_clock_ticks(group_info, __current_tid()) < 6707249783 ){
-        printk(KERN_EMERG "WAITING for %d\n", __current_tid());
-      __debug_print(group_info);
-      }*/
     spin_unlock_irqrestore(&group_info->lock, flags);
     if (lowest_tid>=0){
         __wake_up_waiting_thread(group_info, lowest_tid);
@@ -929,5 +928,7 @@ void cleanup_module(void)
   task_clock_func.task_clock_entry_start=NULL;
 
   printk(KERN_EMERG " counter %d\n",  debug_counter_overflow);
+  
+  __clock_debug_print_overflow(); 
 
 }
