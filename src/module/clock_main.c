@@ -731,6 +731,7 @@ void task_clock_entry_sleep(struct task_clock_group_info * group_info){
 
 }
 
+//our thread is waking up
 void task_clock_entry_woke_up(struct task_clock_group_info * group_info){
     unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);    
@@ -739,48 +740,13 @@ void task_clock_entry_woke_up(struct task_clock_group_info * group_info){
     spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
-//utility function to read the performance counter
-void __read_perf_counter(struct hw_perf_event * hwc, uint64_t * _new_raw_count, uint64_t * _prev_raw_count){
-    uint64_t new_raw_count, prev_raw_count;
- again:    
-    //read the raw counter
-    rdmsrl(hwc->event_base + hwc->idx, new_raw_count);
-    //get previous count
-    prev_raw_count = local64_read(&hwc->prev_count);
-    //in case an NMI fires while we're doing this...unlikely but who knows?!
-    if (local64_cmpxchg(&hwc->prev_count, prev_raw_count, new_raw_count) != prev_raw_count){
-        goto again;
-    }
-    //set the arguments to the values read
-    *_new_raw_count=new_raw_count;
-    *_prev_raw_count=prev_raw_count;
-}
-
+//Called when the counting has finished...we don't actually stop counting, we just
+//won't consider ticks that happen after this
 void task_clock_entry_stop(struct task_clock_group_info * group_info){
     uint64_t new_raw_count, prev_raw_count;
     int64_t delta;
-    //for our version of perf counters (v3 for Intel) this works...probably not for anything else
-    //ARCH_DEP_TODO
-    int shift = 16;
     int lowest_tid=-1;
-    
-
-    /*struct hw_perf_event * hwc = &group_info->clocks[current->task_clock.tid].event->hw;
-    //read the counters using rdmsr
-    __read_perf_counter(hwc, &new_raw_count, &prev_raw_count);
-    //if this succeeds, then its safe to turn off the tick_counter...meaning we no longer do work inside the overflow handler.
-    //Even if an NMI beats us to it...it won't have any work to do since prev_raw_count==new_raw_count after the cmpxchg
-    __tick_counter_turn_off(group_info);
-    //compute how much the counter has counted. The shift is used since only the first N (currently hard-coded to 48) bits matter
-    delta = (new_raw_count << shift) - (prev_raw_count << shift);
-    //shift it back to get the actually correct number
-    delta >>= shift;
-    //add it to our current clock
-    __inc_clock_ticks(group_info, current->task_clock.tid, delta);
-    //let userspace see it
-    current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);*/
-    
-
+    //read the counter and update our clock
     logical_clock_read_clock_and_update(group_info, __current_tid());
     
     unsigned long flags;
@@ -793,23 +759,14 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
         __wake_up_waiting_thread(group_info, lowest_tid);
     }
 
-
     BUG_ON(delta > MAX_CLOCK_SAMPLE_PERIOD*5);
     BUG_ON(delta < 0);
 }
 
+//lets start caring about the ticks we see (again)
 void task_clock_entry_start(struct task_clock_group_info * group_info){
-    uint64_t new_raw_count, prev_raw_count;
-    struct hw_perf_event * hwc = &group_info->clocks[current->task_clock.tid].event->hw;
-    //by "reading" the counter, we reset the prev_count to the current count. But we won't actually
-    //do anything with the delta. That will effectively throw away the ticks that were counted (since
-    //we don't want them)
-    __read_perf_counter(hwc, &new_raw_count, &prev_raw_count);
-    //reset the event's counter to 0
-    local64_set(&group_info->clocks[__current_tid()].event->count, 0);
-    /*printk(KERN_EMERG "TASK CLOCK: START read ticks for %d is %llu\n", 
-      current->task_clock.tid, __get_clock_ticks(group_info, current->task_clock.tid));*/
-    //do the rest of what needs to be done (look for others to wakeup, etc...)
+    //the clock may have continued to run...so reset the ticks we've seen
+    logical_clock_reset_current_ticks(group_info,__current_tid());
     task_clock_on_enable(group_info);
 }
 

@@ -52,5 +52,7 @@ static inline void logical_clock_reset_current_ticks(struct task_clock_group_inf
     uint64_t new_raw_count, prev_raw_count;
     //we can just read the counter...since that will effectively reset it
     __read_performance_counter(&group_info->clocks[id].event->hw, &new_raw_count, &prev_raw_count);
+    //reset the event's counter to 0
+    local64_set(&group_info->clocks[id].event->count, 0);
 }
 #endif
