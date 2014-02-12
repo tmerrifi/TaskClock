@@ -277,7 +277,7 @@ void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_l
 
 
 void task_clock_debug_add_event(struct task_clock_group_info * group_info, int32_t event){
-    __clock_debug_overflow(group_info, 0, event);
+    //__clock_debug_overflow(group_info, 0, event);
 }
 
 void __clock_debug_print(void){
@@ -486,7 +486,6 @@ int __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_i
     //if we're the only active thread, do our work and get out
     if (__current_is_only_active_thread(group_info)){
         //set it as a single active thread
-        task_clock_debug_add_event(group_info, 6969);
         current->task_clock.user_status->single_active_thread=1;
         __set_current_thread_to_lowest(group_info);
     }
@@ -701,8 +700,6 @@ void task_clock_entry_halt(struct task_clock_group_info * group_info){
   printk(KERN_EMERG "TASK CLOCK: halting %d\n", __current_tid());
 #endif
   
-  task_clock_debug_add_event(group_info, 80085);
-
   __mark_as_inactive(group_info, __current_tid());
   //are we the lowest?
   if (group_info->lowest_tid==current->task_clock.tid || group_info->lowest_tid==-1){
@@ -732,7 +729,6 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
   spin_lock_irqsave(&group_info->lock, flags);
   __set_base_ticks(group_info, current->task_clock.tid,group_info->lowest_ticks);
   __clear_entry_state(group_info);
-  task_clock_debug_add_event(group_info, 1234);
   __mark_as_active(group_info, __current_tid());
   __reset_period(group_info);
   __update_period(group_info);
@@ -929,6 +925,6 @@ void cleanup_module(void)
 
   printk(KERN_EMERG " counter %d\n",  debug_counter_overflow);
   
-  __clock_debug_print_overflow(); 
+  //__clock_debug_print_overflow(); 
 
 }
