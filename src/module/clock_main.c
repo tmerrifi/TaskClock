@@ -19,6 +19,12 @@
 
 #include "listarray.h"
 
+#ifdef LOGICAL_CLOCK_NO_TICKS
+#include "logical_clock_no_ticks.h"
+#else
+#include "logical_clock_instruction_counting.h"
+#endif
+
 MODULE_LICENSE("GPL");
 
 #define MAX_CLOCK_SAMPLE_PERIOD 200000
@@ -92,28 +98,6 @@ unsigned long __elapsed_time_ns(struct timespec * t1, struct timespec * t2){
 
 #define __tick_counter_is_running(group_info) \
     group_info->clocks[__current_tid()].count_ticks
-
-
-    
-    
-
-#ifdef NO_INSTRUCTION_COUNTING
-
-#define __update_clock_ticks(group_info, tid)                           \
-    unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); \
-    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         \
-    local64_set(&group_info->clocks[tid].event->count, 0);
-
-
-#else
-
-#define __update_clock_ticks(group_info, tid)                           \
-    unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); \
-    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         \
-    if (rawcount < 0) printk(KERN_EMERG "UHOH, %d\n",tid); \
-    group_info->clocks[tid].ticks+=rawcount; \ 
-    local64_set(&group_info->clocks[tid].event->count, 0);
-#endif
 
 #define __inc_clock_ticks(group_info, tid, val) (group_info->clocks[tid].ticks+=val)
 
@@ -427,7 +411,7 @@ void task_clock_entry_overflow_update_period(struct task_clock_group_info * grou
     
     spin_lock_irqsave(&group_info->nmi_lock, flags);
 
-    __update_clock_ticks(group_info, current->task_clock.tid);
+    logical_clock_update(group_info, current->task_clock.tid);
 
     __update_period(group_info);
 
@@ -450,15 +434,9 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   new_low=__new_lowest(group_info, current->task_clock.tid);
   
   if (new_low >= 0 && new_low != current->task_clock.tid && group_info->nmi_new_low==0){
-#if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
-      printk(KERN_EMERG "TASK CLOCK: new low %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
-#endif
       //there is a new lowest thread, make sure to set it
       if (__thread_is_waiting(group_info, new_low)){
           group_info->nmi_new_low=1;
-#if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
-          printk(KERN_EMERG "----TASK CLOCK: notifying %d ticks %llu\n", new_low, __get_clock_ticks(group_info, new_low));
-#endif
           //schedule work to be done when we are not in NMI context
           irq_work_queue(&group_info->pending_work);
       }
@@ -537,7 +515,7 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
     //turn the counter off...not that it matters since the "real" perf-counter is off
     __tick_counter_turn_off(group_info);
     //update our clock in case some of the instructions weren't counted in the overflow handler
-    __update_clock_ticks(group_info, current->task_clock.tid);
+    logical_clock_update(group_info, current->task_clock.tid);
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 10);
     //am I the lowest?
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
