@@ -19,7 +19,7 @@
 
 #include "listarray.h"
 #include "utility.h"
-
+#include "search_entries.h"
 
 #ifdef NO_INSTRUCTION_COUNTING
 #include "logical_clock_no_ticks.h"
@@ -28,10 +28,6 @@
 #endif
 
 MODULE_LICENSE("GPL");
-
-#define MAX_CLOCK_SAMPLE_PERIOD 200000
-
-#define MIN_CLOCK_SAMPLE_PERIOD 1024
 
 #define DEBUG_THREAD_COUNT 10
 
@@ -80,64 +76,6 @@ unsigned long __elapsed_time_ns(struct timespec * t1, struct timespec * t2){
         
     return (end->tv_sec-start->tv_sec)*1000000000+(end->tv_nsec-start->tv_nsec);
 }
-
-//is this current tick_count the lowest
-int __is_lowest(struct task_clock_group_info * group_info, int32_t tid){
-  if (tid==group_info->lowest_tid ||
-      __get_clock_ticks(group_info, tid) < __get_clock_ticks(group_info, group_info->lowest_tid)){
-    return 1;
-  }
-  return 0;
-} 
-
-int32_t  __search_for_lowest_waiting_exclude_current(struct task_clock_group_info * group_info, int32_t tid){
-    int i=0;
-    int32_t min_tid=-1;
-    listarray_foreach(group_info->active_threads, i){
-        struct task_clock_entry_info * entry = &group_info->clocks[i];
-        if (entry->initialized && !entry->inactive && entry->waiting && i!=tid && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
-            min_tid=i;
-        }
-    }
-    
-    return (min_tid >=0) ? min_tid : -1;
-}
-
-
-int32_t __search_for_lowest(struct task_clock_group_info * group_info){
-  int i=0;
-  int32_t min_tid=-1;
-  //for (;i<TASK_CLOCK_MAX_THREADS;++i){
-  listarray_foreach(group_info->active_threads, i){
-    struct task_clock_entry_info * entry = &group_info->clocks[i];
-    if (entry->initialized && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
-        min_tid=i;
-    }
-  }
-  return min_tid;
-}
-
-//This function must be called while holding the group lock
-int32_t __search_for_lowest_waiting(struct task_clock_group_info * group_info){
-    int thread_arr[128];
-    int i=0;
-    int low=-1;
-
-    //for (;i<TASK_CLOCK_MAX_THREADS;++i){
-    listarray_foreach(group_info->active_threads, i){
-        struct task_clock_entry_info * entry = &group_info->clocks[i];
-        if (entry->waiting){
-            thread_arr[i]=1;
-        }
-    }
-    
-    //now find the lowest
-    low=__search_for_lowest(group_info);
-    //if the lowest is greater than zero and it was waiting...return it
-    return (low >= 0 && thread_arr[low]==1) ? low : -1;
-}
-
-
 
 void __debug_print(struct task_clock_group_info * group_info){
   int i=0;
@@ -321,31 +259,6 @@ void __task_clock_notify_waiting_threads(struct irq_work * work){
     }
 }
 
-void __update_period(struct task_clock_group_info * group_info){
-    uint64_t lowest_waiting_tid_clock, myclock, new_sample_period;
-    int32_t lowest_waiting_tid=0;    
-
-    if (group_info->clocks[current->task_clock.tid].event){
-        new_sample_period=group_info->clocks[current->task_clock.tid].event->hw.sample_period+10000;
-        lowest_waiting_tid = __search_for_lowest_waiting_exclude_current(group_info, current->task_clock.tid);
-        if (lowest_waiting_tid>=0){
-            lowest_waiting_tid_clock = __get_clock_ticks(group_info,lowest_waiting_tid);
-            myclock = __get_clock_ticks(group_info,current->task_clock.tid);
-            //if there is a waiting thread, and its clock is larger than ours, stop when we get there
-            if (lowest_waiting_tid_clock > myclock){
-                new_sample_period=__max(lowest_waiting_tid_clock - myclock + 1000, MIN_CLOCK_SAMPLE_PERIOD);
-            }
-        }
-        group_info->clocks[current->task_clock.tid].debug_last_sample_period = group_info->clocks[current->task_clock.tid].event->hw.sample_period;
-        group_info->clocks[current->task_clock.tid].event->hw.sample_period =  __min(new_sample_period, MAX_CLOCK_SAMPLE_PERIOD);
-    }
-}
-
-void __reset_period(struct task_clock_group_info * group_info){
-    group_info->clocks[current->task_clock.tid].event->hw.sample_period=0;
-    local64_set(&group_info->clocks[current->task_clock.tid].event->hw.period_left,0);
-}
-
 void task_clock_entry_overflow_update_period(struct task_clock_group_info * group_info){
     unsigned long flags;
 
@@ -356,10 +269,10 @@ void task_clock_entry_overflow_update_period(struct task_clock_group_info * grou
     
     spin_lock_irqsave(&group_info->nmi_lock, flags);
 
-    logical_clock_update_clock_ticks(group_info, current->task_clock.tid);
+    logical_clock_update_clock_ticks(group_info, __current_tid());
 
-    __update_period(group_info);
-
+    //__update_period(group_info);
+    logical_clock_update_overflow_period(group_info, __current_tid());
 
     spin_unlock_irqrestore(&group_info->nmi_lock, flags);
 
@@ -506,8 +419,9 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
     printk(KERN_EMERG "TASK CLOCK: ENABLING %d, lowest? %d\n", current->task_clock.tid, group_info->lowest_tid);
 #endif
-    __reset_period(group_info);
-    __update_period(group_info);
+    logical_clock_reset_overflow_period(group_info, __current_tid());
+    //__update_period(group_info);
+    logical_clock_update_overflow_period(group_info, __current_tid());
     
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 12);
     //are we the lowest?
@@ -659,8 +573,9 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
   __set_base_ticks(group_info, current->task_clock.tid,group_info->lowest_ticks);
   __clear_entry_state(group_info);
   __mark_as_active(group_info, __current_tid());
-  __reset_period(group_info);
-  __update_period(group_info);
+  logical_clock_reset_overflow_period(group_info, __current_tid());
+  //__update_period(group_info);
+  logical_clock_update_overflow_period(group_info, __current_tid());
   current->task_clock.user_status->notifying_id=0;
   current->task_clock.user_status->notifying_clock=666;
   current->task_clock.user_status->notifying_sample=666;
@@ -758,9 +673,6 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
     if (lowest_tid>=0){
         __wake_up_waiting_thread(group_info, lowest_tid);
     }
-
-    BUG_ON(delta > MAX_CLOCK_SAMPLE_PERIOD*5);
-    BUG_ON(delta < 0);
 }
 
 //lets start caring about the ticks we see (again)

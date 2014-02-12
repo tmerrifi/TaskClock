@@ -2,6 +2,12 @@
 #ifndef LOGICAL_CLOCK_H
 #define LOGICAL_CLOCK_H
 
+//whats the max overflow period
+#define MAX_CLOCK_SAMPLE_PERIOD 200000
+
+//whats the minimum overflow period
+#define MIN_CLOCK_SAMPLE_PERIOD 1024
+
 #define logical_clock_update_clock_ticks(group_info, tid)                           \
     unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); \
     group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         \
@@ -55,4 +61,33 @@ static inline void logical_clock_reset_current_ticks(struct task_clock_group_inf
     //reset the event's counter to 0
     local64_set(&group_info->clocks[id].event->count, 0);
 }
+
+static inline void logical_clock_update_overflow_period(struct task_clock_group_info * group_info, int id){
+    uint64_t lowest_waiting_tid_clock, myclock, new_sample_period;
+    int32_t lowest_waiting_tid=0;    
+
+    if (group_info->clocks[current->task_clock.tid].event){
+        new_sample_period=group_info->clocks[current->task_clock.tid].event->hw.sample_period+10000;
+        lowest_waiting_tid = __search_for_lowest_waiting_exclude_current(group_info, current->task_clock.tid);
+        if (lowest_waiting_tid>=0){
+            lowest_waiting_tid_clock = __get_clock_ticks(group_info,lowest_waiting_tid);
+            myclock = __get_clock_ticks(group_info,current->task_clock.tid);
+            //if there is a waiting thread, and its clock is larger than ours, stop when we get there
+            if (lowest_waiting_tid_clock > myclock){
+                new_sample_period=__max(lowest_waiting_tid_clock - myclock + 1000, MIN_CLOCK_SAMPLE_PERIOD);
+            }
+        }
+        group_info->clocks[current->task_clock.tid].debug_last_sample_period = group_info->clocks[current->task_clock.tid].event->hw.sample_period;
+        group_info->clocks[current->task_clock.tid].event->hw.sample_period =  __min(new_sample_period, MAX_CLOCK_SAMPLE_PERIOD);
+    }
+}
+
+static inline void logical_clock_reset_overflow_period(struct task_clock_group_info * group_info, int id){
+    group_info->clocks[current->task_clock.tid].event->hw.sample_period=0;
+    local64_set(&group_info->clocks[current->task_clock.tid].event->hw.period_left,0);
+}
+
+
+
+
 #endif

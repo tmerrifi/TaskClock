@@ -8,4 +8,8 @@
 
 #define logical_clock_reset_current_ticks(group_info, id)
 
+#define logical_clock_update_overflow_period(group_info, id)
+
+#define logical_clock_reset_overflow_period(group_info, id)
+
 #endif
