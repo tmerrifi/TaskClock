@@ -18,6 +18,14 @@
 #include <linux/vmalloc.h>
 
 #include "listarray.h"
+#include "utility.h"
+
+
+#ifdef NO_INSTRUCTION_COUNTING
+#include "logical_clock_no_ticks.h"
+#else
+#include "logical_clock_instruction_counting.h"
+#endif
 
 MODULE_LICENSE("GPL");
 
@@ -73,81 +81,6 @@ unsigned long __elapsed_time_ns(struct timespec * t1, struct timespec * t2){
     return (end->tv_sec-start->tv_sec)*1000000000+(end->tv_nsec-start->tv_nsec);
 }
 
-
-#define __current_tid() current->task_clock.tid
-
-#define __min(val1, val2) ((val1<val2) ? val1 : val2)
-
-#define __max(val1, val2) ((val1>val2) ? val1 : val2)
-
-#define __set_base_ticks(group_info, tid, val) (group_info->clocks[tid].base_ticks=val)
-
-#define __get_base_ticks(group_info, tid) (group_info->clocks[tid].base_ticks)
-
-#define __tick_counter_turn_off(group_info) \
-    group_info->clocks[__current_tid()].count_ticks=0;
-
-#define __tick_counter_turn_on(group_info) \
-    group_info->clocks[__current_tid()].count_ticks=1;
-
-#define __tick_counter_is_running(group_info) \
-    group_info->clocks[__current_tid()].count_ticks
-
-
-    
-    
-
-#ifdef NO_INSTRUCTION_COUNTING
-
-#define __update_clock_ticks(group_info, tid)                           \
-    unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); \
-    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         \
-    local64_set(&group_info->clocks[tid].event->count, 0);
-
-
-#else
-
-#define __update_clock_ticks(group_info, tid)                           \
-    unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); \
-    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         \
-    if (rawcount < 0) printk(KERN_EMERG "UHOH, %d\n",tid); \
-    group_info->clocks[tid].ticks+=rawcount; \ 
-    local64_set(&group_info->clocks[tid].event->count, 0);
-#endif
-
-#define __inc_clock_ticks(group_info, tid, val) (group_info->clocks[tid].ticks+=val)
-
-#define __set_clock_ticks(group_info, tid, val) (group_info->clocks[tid].ticks=val)
-
-#define __get_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks + group_info->clocks[tid].base_ticks)
-
-
-#define __clock_is_lower(group_info, tid1, tid2) ( ((__get_clock_ticks(group_info, tid1))  < (__get_clock_ticks(group_info, tid2))) \
-                                               || ((__get_clock_ticks(group_info, tid1)) == (__get_clock_ticks(group_info, tid2))  && (tid1 < tid2)))
-
-#define __clear_entry_state(group_info) \
-    group_info->clocks[__current_tid()].inactive=0;\
-    group_info->clocks[__current_tid()].waiting=0;\
-    group_info->clocks[__current_tid()].sleeping=0;
-    
-
-#define __clear_entry_state_by_id(group_info, id) \
-    group_info->clocks[id].inactive=0;\
-    group_info->clocks[id].waiting=0;\
-    group_info->clocks[id].sleeping=0;
-
-#define __mark_as_inactive(group_info, id)         \
-    group_info->clocks[id].inactive=1; \
-    listarray_remove(group_info->active_threads, id);
-
-#define __mark_as_active(group_info, id)         \
-    group_info->clocks[id].inactive=0; \
-    listarray_insert(group_info->active_threads, id);
-
-//Am I the only one here????
-#define __current_is_only_active_thread(group_info) \
-    (listarray_count(group_info->active_threads)==1 && group_info->clocks[__current_tid()].inactive==0)
-
 //is this current tick_count the lowest
 int __is_lowest(struct task_clock_group_info * group_info, int32_t tid){
   if (tid==group_info->lowest_tid ||
@@ -181,10 +114,6 @@ int32_t __search_for_lowest(struct task_clock_group_info * group_info){
         min_tid=i;
     }
   }
-
-
-
-
   return min_tid;
 }
 
@@ -427,7 +356,7 @@ void task_clock_entry_overflow_update_period(struct task_clock_group_info * grou
     
     spin_lock_irqsave(&group_info->nmi_lock, flags);
 
-    __update_clock_ticks(group_info, current->task_clock.tid);
+    logical_clock_update_clock_ticks(group_info, current->task_clock.tid);
 
     __update_period(group_info);
 
@@ -537,7 +466,7 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
     //turn the counter off...not that it matters since the "real" perf-counter is off
     __tick_counter_turn_off(group_info);
     //update our clock in case some of the instructions weren't counted in the overflow handler
-    __update_clock_ticks(group_info, current->task_clock.tid);
+    logical_clock_update_clock_ticks(group_info, current->task_clock.tid);
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 10);
     //am I the lowest?
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
@@ -834,7 +763,9 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
     //ARCH_DEP_TODO
     int shift = 16;
     int lowest_tid=-1;
-    struct hw_perf_event * hwc = &group_info->clocks[current->task_clock.tid].event->hw;
+    
+
+    /*struct hw_perf_event * hwc = &group_info->clocks[current->task_clock.tid].event->hw;
     //read the counters using rdmsr
     __read_perf_counter(hwc, &new_raw_count, &prev_raw_count);
     //if this succeeds, then its safe to turn off the tick_counter...meaning we no longer do work inside the overflow handler.
@@ -847,7 +778,10 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
     //add it to our current clock
     __inc_clock_ticks(group_info, current->task_clock.tid, delta);
     //let userspace see it
-    current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
+    current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);*/
+    
+
+    logical_clock_read_clock_and_update(group_info, __current_tid());
     
     unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);
