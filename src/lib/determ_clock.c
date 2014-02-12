@@ -128,6 +128,10 @@ int determ_task_clock_single_active_thread(){
     return task_clock_info.user_status->single_active_thread;
 }
 
+void determ_task_clock_clear_single_active_thread(){
+    task_clock_info.user_status->single_active_thread=0;
+}
+
 u_int64_t determ_debug_notifying_clock_read(){
     return task_clock_info.user_status->notifying_clock;
 }
