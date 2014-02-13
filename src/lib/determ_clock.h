@@ -67,7 +67,6 @@
      int determ_debug_notifying_id_read();
      int determ_debug_notifying_sample_read();
      int determ_debug_notifying_diff_read();
-
      int determ_task_clock_is_lowest_wait();
      int determ_task_clock_is_lowest();
      void determ_task_clock_start();
@@ -81,6 +80,7 @@
      void determ_task_clock_clear_single_active_thread();
      void determ_debugging_print_event();
      int determ_debugging_is_disabled();
+     void determ_task_clock_close();
      u_int32_t determ_task_get_id();
      struct determ_task_clock_info determ_task_clock_get_info();
 #endif

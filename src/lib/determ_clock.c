@@ -150,8 +150,6 @@ int determ_debug_notifying_diff_read(){
 
 
 u_int64_t determ_task_clock_read(){
-    //perf_counter_stop(task_clock_info.perf_counter);
-    //printf("process %d reading ticks at %p\n", getpid(), &task_clock_info.user_status->ticks);
     return task_clock_info.user_status->ticks;
 }
 
@@ -296,7 +294,6 @@ void determ_task_clock_stop(){
         printf("\nClock read failed\n");
         exit(EXIT_FAILURE);
     }
-    //perf_counter_stop(&task_clock_info.perf_counter);
 
 #if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
     uint64_t diff=0;
@@ -326,3 +323,7 @@ u_int32_t determ_task_get_id(){
 }
 
 void determ_debugging_print_event(){}
+
+void determ_task_clock_close(){
+    perf_counter_close(&task_clock_info.perf_counter);
+}
