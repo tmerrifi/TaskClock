@@ -66,19 +66,19 @@ static inline void logical_clock_update_overflow_period(struct task_clock_group_
     uint64_t lowest_waiting_tid_clock, myclock, new_sample_period;
     int32_t lowest_waiting_tid=0;    
 
-    if (group_info->clocks[current->task_clock.tid].event){
-        new_sample_period=group_info->clocks[current->task_clock.tid].event->hw.sample_period+10000;
-        lowest_waiting_tid = __search_for_lowest_waiting_exclude_current(group_info, current->task_clock.tid);
+    if (group_info->clocks[id].event){
+        new_sample_period=group_info->clocks[id].event->hw.sample_period+10000;
+        lowest_waiting_tid = __search_for_lowest_waiting_exclude_current(group_info, id);
         if (lowest_waiting_tid>=0){
             lowest_waiting_tid_clock = __get_clock_ticks(group_info,lowest_waiting_tid);
-            myclock = __get_clock_ticks(group_info,current->task_clock.tid);
+            myclock = __get_clock_ticks(group_info,id);
             //if there is a waiting thread, and its clock is larger than ours, stop when we get there
             if (lowest_waiting_tid_clock > myclock){
                 new_sample_period=__max(lowest_waiting_tid_clock - myclock + 1000, MIN_CLOCK_SAMPLE_PERIOD);
             }
         }
-        group_info->clocks[current->task_clock.tid].debug_last_sample_period = group_info->clocks[current->task_clock.tid].event->hw.sample_period;
-        group_info->clocks[current->task_clock.tid].event->hw.sample_period =  __min(new_sample_period, MAX_CLOCK_SAMPLE_PERIOD);
+        group_info->clocks[id].debug_last_sample_period = group_info->clocks[id].event->hw.sample_period;
+        group_info->clocks[id].event->hw.sample_period =  __min(new_sample_period, MAX_CLOCK_SAMPLE_PERIOD);
     }
 }
 

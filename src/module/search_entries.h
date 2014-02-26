@@ -14,10 +14,20 @@ static inline int __is_lowest(struct task_clock_group_info * group_info, int32_t
 static inline int32_t  __search_for_lowest_waiting_exclude_current(struct task_clock_group_info * group_info, int32_t tid){
     int i=0;
     int32_t min_tid=-1;
-    listarray_foreach(group_info->active_threads, i){
-        struct task_clock_entry_info * entry = &group_info->clocks[i];
-        if (entry->initialized && !entry->inactive && entry->waiting && i!=tid && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
-            min_tid=i;
+    if (in_nmi()){
+        listarray_foreach_allelements(group_info->active_threads, i){
+            struct task_clock_entry_info * entry = &group_info->clocks[i];
+            if (entry->initialized && !entry->inactive && entry->waiting && i!=tid && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
+                min_tid=i;
+            }
+        }
+    }
+    else{
+        listarray_foreach(group_info->active_threads, i){
+            struct task_clock_entry_info * entry = &group_info->clocks[i];
+            if (entry->initialized && !entry->inactive && entry->waiting && i!=tid && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
+                min_tid=i;
+            }
         }
     }
     
@@ -28,12 +38,21 @@ static inline int32_t  __search_for_lowest_waiting_exclude_current(struct task_c
 static inline int32_t __search_for_lowest(struct task_clock_group_info * group_info){
   int i=0;
   int32_t min_tid=-1;
-  //for (;i<TASK_CLOCK_MAX_THREADS;++i){
-  listarray_foreach(group_info->active_threads, i){
-    struct task_clock_entry_info * entry = &group_info->clocks[i];
-    if (entry->initialized && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
-        min_tid=i;
-    }
+  if (in_nmi()){
+      listarray_foreach_allelements(group_info->active_threads, i){
+          struct task_clock_entry_info * entry = &group_info->clocks[i];
+          if (entry->initialized && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
+              min_tid=i;
+          }
+      }
+  }
+  else{
+      listarray_foreach(group_info->active_threads, i){
+          struct task_clock_entry_info * entry = &group_info->clocks[i];
+          if (entry->initialized && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
+              min_tid=i;
+          }
+      }
   }
   return min_tid;
 }

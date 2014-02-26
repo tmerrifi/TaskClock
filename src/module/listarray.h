@@ -28,11 +28,15 @@ struct listarray{
     struct listarray_entry entries[LISTARRAY_MAX_SIZE];
     listarray_entry_ptr_t head, tail;
     int count;
+    int max_index;
 };
 
 #define listarray_foreach(la, int_i)                 \
     for (int_i=la->head;int_i!=LISTARRAY_ENTRY_NULL;int_i=listarray_getentry(la, int_i).next) \
     
+#define listarray_foreach_allelements(la, int_i) \
+    for (int_i=0;int_i<la->max_index;int_i++) \
+
 #define __print_debugging(la, int_i)                                   \
     printk(KERN_EMERG "index: %d, next %d, prev %d, head %d, tail %d, count %d\n", \
            int_i, listarray_getentry(la, int_i).next, listarray_getentry(la, int_i).prev, \
@@ -42,6 +46,7 @@ static inline void listarray_init(struct listarray * la){
     int i;
     la->head=la->tail=LISTARRAY_ENTRY_NULL;
     la->count=0;
+    la->max_index=0;
     //initialize all entries to being not in the list
     for (i=0;i<LISTARRAY_MAX_SIZE;++i){
         la->entries[i].next=la->entries[i].prev=LISTARRAY_ENTRY_DEAD;
@@ -70,6 +75,9 @@ static inline void listarray_insert(struct listarray * la, int index){
     }
     listarray_getentry(la, index).next=LISTARRAY_ENTRY_NULL;
     la->count++;
+    if (index>la->max_index){
+        la->max_index=index;
+    }
 
     //printk(KERN_EMERG "done inserting %d\n", index);
     //__print_debugging(la, index);
