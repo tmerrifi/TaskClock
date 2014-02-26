@@ -19,7 +19,6 @@
 #include "perf_counter.h"
 #include "determ_perf_event.h"
 
-
 struct determ_clock_info * clock_info;
 struct determ_task_clock_info task_clock_info;
 
@@ -87,7 +86,6 @@ __attribute__((constructor)) static void determ_clock_init(){
     strcpy(clock_info->clock_file_name, file_name);
     memset(clock_info->event_debugging, 0, DETERM_EVENT_DEBUGGING_SIZE * sizeof(u_int64_t));
     memset(clock_info->event_tick_debugging, 0, DETERM_EVENT_DEBUGGING_SIZE * sizeof(u_int64_t));
-    clock_info->current_event_count=0;
     //initialize the first clock now
     determ_task_clock_init();
     clock_info->leader_perf_counter=&task_clock_info.perf_counter;
@@ -114,6 +112,9 @@ void determ_task_clock_init_with_id(u_int32_t id){
     task_clock_info.user_status = &clock_info->user_status[task_clock_info.tid]; //malloc(sizeof(struct task_clock_user_status));
     memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
     task_clock_info.disabled=0;
+    //set the last clock value to zero
+    task_clock_info.last_clock_value=0;
+    tx_estimate_init(&task_clock_info.estimator);
     //set up the task clock for our process
     __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
     //set up the performance counter
@@ -160,10 +161,7 @@ void __woke_up(){
         exit(EXIT_FAILURE);
     }
     task_clock_info.disabled=0;
-    u_int64_t count = __sync_fetch_and_add(&clock_info->current_event_count,1);
-    //ok, now set the debugging stuff
-    //clock_info->event_debugging[count]=task_clock_info.tid;
-    //clock_info->event_tick_debugging[count]=task_clock_info.user_status->ticks;
+    task_clock_info.user_status->lowest_clock=0;
 }
 
 int determ_debugging_is_disabled(){
@@ -171,7 +169,8 @@ int determ_debugging_is_disabled(){
 }
 
 int determ_task_clock_is_lowest(){
-    if (!task_clock_info.disabled){
+
+    if (!task_clock_info.disabled && !task_clock_info.user_status->lowest_clock){
         if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WAIT, 0) != 0){
             printf("\nClock wait failed\n");
             exit(EXIT_FAILURE);
@@ -272,6 +271,8 @@ void determ_task_clock_start(){
 #endif
     task_clock_info.disabled=0;
     task_clock_info.user_status->lowest_clock=0;
+    //set the last clock read so we can figure out later the length of the tx in instructions
+    task_clock_info.last_clock_value=determ_task_clock_read();
     if (diff>0){
         determ_task_clock_add_ticks(diff);
     }
@@ -294,7 +295,7 @@ void determ_task_clock_stop(){
         printf("\nClock read failed\n");
         exit(EXIT_FAILURE);
     }
-
+    tx_estimate_add_observation(&task_clock_info.estimator, determ_task_clock_read() - task_clock_info.last_clock_value);
 #if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
     uint64_t diff=0;
 #ifdef DEBUG_CLOCK_CACHE_PROFILE
@@ -307,6 +308,11 @@ void determ_task_clock_stop(){
     }
 #endif
 }
+
+u_int64_t determ_task_clock_estimate_next_tx(){
+    return tx_estimate_next_observation_guess(&task_clock_info.estimator);
+}
+
 
 //Calling halt means that we are no longer considered as "part of the group." We can't have the lowest clock.
 void determ_task_clock_halt(){
