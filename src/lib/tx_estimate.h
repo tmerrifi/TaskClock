@@ -32,7 +32,7 @@ static inline int64_t tx_estimate_next_observation_guess(struct tx_estimate * tx
         for (int i=0;i<TX_ESTIMATE_TOTAL_OBSERVVATIONS;++i){
             total+=abs(tx->observations[i]-tx->ewma);
         }
-        result=(tx->ewma+2*(total/TX_ESTIMATE_TOTAL_OBSERVVATIONS));
+        result=(tx->ewma+(total/TX_ESTIMATE_TOTAL_OBSERVVATIONS));
     }
     else{
         result=-1;
