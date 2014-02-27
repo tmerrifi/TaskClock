@@ -288,6 +288,10 @@ void determ_task_clock_start(){
     }
 }
 
+u_int64_t determ_task_clock_get_last_tx_size(){
+    return determ_task_clock_read() - task_clock_info.last_clock_value;
+}
+
 void determ_task_clock_stop(){
 
     //read the clock
@@ -295,7 +299,7 @@ void determ_task_clock_stop(){
         printf("\nClock read failed\n");
         exit(EXIT_FAILURE);
     }
-    tx_estimate_add_observation(&task_clock_info.estimator, determ_task_clock_read() - task_clock_info.last_clock_value);
+    tx_estimate_add_observation(&task_clock_info.estimator, determ_task_clock_get_last_tx_size());
 #if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
     uint64_t diff=0;
 #ifdef DEBUG_CLOCK_CACHE_PROFILE
@@ -309,7 +313,7 @@ void determ_task_clock_stop(){
 #endif
 }
 
-u_int64_t determ_task_clock_estimate_next_tx(){
+int64_t determ_task_clock_estimate_next_tx(){
     return tx_estimate_next_observation_guess(&task_clock_info.estimator);
 }
 

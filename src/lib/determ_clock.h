@@ -86,7 +86,8 @@
      int determ_debugging_is_disabled();
      void determ_task_clock_close();
      u_int32_t determ_task_get_id();
-     u_int64_t determ_task_clock_estimate_next_tx();
+     int64_t determ_task_clock_estimate_next_tx();
+     u_int64_t determ_task_clock_get_last_tx_size();
      struct determ_task_clock_info determ_task_clock_get_info();
 #endif
 
