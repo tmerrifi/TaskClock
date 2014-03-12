@@ -292,14 +292,18 @@ u_int64_t determ_task_clock_get_last_tx_size(){
     return determ_task_clock_read() - task_clock_info.last_clock_value;
 }
 
-void determ_task_clock_stop(){
 
+void determ_task_clock_stop(){
+    determ_task_clock_stop_with_id(0);
+}
+
+void determ_task_clock_stop_with_id(uint32_t id){
     //read the clock
     if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_STOP) != 0){
         printf("\nClock read failed\n");
         exit(EXIT_FAILURE);
     }
-    tx_estimate_add_observation(&task_clock_info.estimator, determ_task_clock_get_last_tx_size());
+    tx_estimate_add_observation(&task_clock_info.estimator, id, determ_task_clock_get_last_tx_size());
 #if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
     uint64_t diff=0;
 #ifdef DEBUG_CLOCK_CACHE_PROFILE
@@ -313,8 +317,8 @@ void determ_task_clock_stop(){
 #endif
 }
 
-int64_t determ_task_clock_estimate_next_tx(){
-    return tx_estimate_next_observation_guess(&task_clock_info.estimator);
+int64_t determ_task_clock_estimate_next_tx(uint32_t id){
+    return tx_estimate_next_observation_guess(&task_clock_info.estimator, id);
 }
 
 
