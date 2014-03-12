@@ -37,7 +37,7 @@
        u_int8_t disabled;
        struct debug_clock_cache debug_clock_cache; //cache of clock values to use (for debugging)
        u_int64_t last_clock_value;
-       struct tx_estimate estimator;
+       struct tx_estimator estimator;
    };
 
    struct determ_clock_info{
@@ -74,6 +74,7 @@
      int determ_task_clock_is_lowest_wait();
      int determ_task_clock_is_lowest();
      void determ_task_clock_start();
+     void determ_task_clock_stop_with_id(uint32_t id);
      void determ_task_clock_stop();
      void determ_task_clock_halt();
      void determ_task_clock_activate();
@@ -86,7 +87,7 @@
      int determ_debugging_is_disabled();
      void determ_task_clock_close();
      u_int32_t determ_task_get_id();
-     int64_t determ_task_clock_estimate_next_tx();
+     int64_t determ_task_clock_estimate_next_tx(uint32_t id);
      u_int64_t determ_task_clock_get_last_tx_size();
      struct determ_task_clock_info determ_task_clock_get_info();
 #endif
