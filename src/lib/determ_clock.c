@@ -191,6 +191,7 @@ int determ_task_clock_is_lowest(){
 //need to call this to make sure we mark ourselves as "waiting"
 void determ_task_clock_on_wakeup(){
     task_clock_info.disabled=0;
+    task_clock_info.user_status->lowest_clock=0;
 }
 
 //we arrive here if we're the lowest clock, else we need to poll and wait
@@ -253,13 +254,23 @@ void determ_task_clock_add_ticks(int32_t ticks){
     }
 }
 
-void determ_task_clock_activate_other(int32_t id){
+//Returns 1 if the thread we activated is now the "lowest"
+int determ_task_clock_activate_other(int32_t id){
+    int ret=0;
     //the only way this flag could change is when we activate others, which happnes on create and cond_signal
     task_clock_info.user_status->single_active_thread=0;
     if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_ACTIVATE_OTHER, id) != 0){
         printf("\nClock start failed\n");
         exit(EXIT_FAILURE);
     }
+    
+    if (task_clock_info.user_status->activated_lowest){
+        //we need to return true
+        ret=1;
+        //reset the flag
+        task_clock_info.user_status->activated_lowest=0;
+    }
+    return ret;
 }
 
 void determ_task_clock_start(){

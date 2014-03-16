@@ -28,6 +28,10 @@
        u_int64_t notifying_sample;
        u_int64_t notifying_diff;
        u_int8_t single_active_thread;
+       //when we activate another thread, if they become the lowest that can interfere with another
+       //thread that thought *they* were the lowest. Setting this flag means we need to tell those
+       //threads that their view of the world needs to be refreshed.
+       u_int8_t activated_lowest;
    } __attribute__ ((aligned (8), packed));
 
    struct determ_task_clock_info{
@@ -78,7 +82,7 @@
      void determ_task_clock_stop();
      void determ_task_clock_halt();
      void determ_task_clock_activate();
-     void determ_task_clock_activate_other(int32_t id);
+     int determ_task_clock_activate_other(int32_t id);
      void determ_task_clock_add_ticks(int32_t ticks);
      void determ_task_clock_on_wakeup();
      int determ_task_clock_single_active_thread();
