@@ -13,6 +13,8 @@
 
 #include <debug_clock_cache.h>     
 
+#include "tx_estimate.h"
+
 #define DETERM_CLOCK_MAX_THREADS 1024
 
 #define DETERM_EVENT_DEBUGGING_SIZE 100000
@@ -26,6 +28,10 @@
        u_int64_t notifying_sample;
        u_int64_t notifying_diff;
        u_int8_t single_active_thread;
+       //when we activate another thread, if they become the lowest that can interfere with another
+       //thread that thought *they* were the lowest. Setting this flag means we need to tell those
+       //threads that their view of the world needs to be refreshed.
+       u_int8_t activated_lowest;
    } __attribute__ ((aligned (8), packed));
 
    struct determ_task_clock_info{
@@ -34,6 +40,8 @@
        struct task_clock_user_status * user_status;
        u_int8_t disabled;
        struct debug_clock_cache debug_clock_cache; //cache of clock values to use (for debugging)
+       u_int64_t last_clock_value;
+       struct tx_estimator estimator;
    };
 
    struct determ_clock_info{
@@ -67,21 +75,24 @@
      int determ_debug_notifying_id_read();
      int determ_debug_notifying_sample_read();
      int determ_debug_notifying_diff_read();
-
      int determ_task_clock_is_lowest_wait();
      int determ_task_clock_is_lowest();
      void determ_task_clock_start();
+     void determ_task_clock_stop_with_id(uint32_t id);
      void determ_task_clock_stop();
      void determ_task_clock_halt();
      void determ_task_clock_activate();
-     void determ_task_clock_activate_other(int32_t id);
+     int determ_task_clock_activate_other(int32_t id);
      void determ_task_clock_add_ticks(int32_t ticks);
      void determ_task_clock_on_wakeup();
      int determ_task_clock_single_active_thread();
      void determ_task_clock_clear_single_active_thread();
      void determ_debugging_print_event();
      int determ_debugging_is_disabled();
+     void determ_task_clock_close();
      u_int32_t determ_task_get_id();
+     int64_t determ_task_clock_estimate_next_tx(uint32_t id);
+     u_int64_t determ_task_clock_get_last_tx_size();
      struct determ_task_clock_info determ_task_clock_get_info();
 #endif
 

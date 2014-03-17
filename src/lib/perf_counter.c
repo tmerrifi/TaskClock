@@ -74,67 +74,41 @@ void perf_counter_init(u_int32_t sample_period, int32_t group_fd, struct perf_co
 }
 
 void perf_counter_start(struct perf_counter_info * pci){
-
-    /*if ( ioctl(pci->fd, PERF_EVENT_IOC_RESET, 0) != 0){
-    printf("\nreset wrong\n");
-    exit(EXIT_FAILURE);
-    }*/
-  
+#ifndef NO_INSTRUCTION_COUNTING
   if ( ioctl(pci->fd, PERF_EVENT_IOC_ENABLE, 0) != 0){
     printf("\nenable wrong\n");
     exit(EXIT_FAILURE);
   }
+#else
+  if ( ioctl(pci->fd, PERF_EVENT_IOC_TASK_CLOCK_START) != 0){
+      printf("\nClock read failed\n");
+      exit(EXIT_FAILURE);
+  }
+#endif
   pci->started=1;
+
 }
 
 void perf_counter_stop(struct perf_counter_info * pci){
+#ifndef NO_INSTRUCTION_COUNTING
   if ( ioctl(pci->fd, PERF_EVENT_IOC_DISABLE, 0) != 0){
     printf("\ndisable wrong\n");
     exit(EXIT_FAILURE);
   }
+#else
+  if ( ioctl(pci->fd, PERF_EVENT_IOC_TASK_CLOCK_STOP) != 0){
+      printf("\nClock read failed\n");
+      exit(EXIT_FAILURE);
+  }
+
+#endif
   pci->started=0;
 }
 
-
-struct perf_event_header * __move_one_record(struct perf_event_header * current){
-  return (struct perf_event_header *)(((u_int8_t *) current) + current->size);
-}
-
-u_int64_t perf_counter_read(struct perf_counter_info * pci){
-  //walk through the ring buffer and count the sample records
-  //long long count;
-
-  if ( ioctl(pci->fd, PERF_EVENT_IOC_DISABLE, 0) != 0){
-    printf("\ndisable wrong\n");
-    exit(EXIT_FAILURE);
-  }
-
-  u_int64_t event_count=0;
-  struct perf_event_header * event_header = (struct perf_event_header *)pci->ring_buffer_current;
-  struct perf_event_mmap_page * meta_data = (struct perf_event_mmap_page *)pci->ring_buffer;
-
-  while(1){
-    //if (event_header->type!=PERF_RECORD_SAMPLE || 
-    //Either the buffer is empty...or we already saw this...so nothing is new
-    if (event_header->size==0){
-      break;
+void perf_counter_close(struct perf_counter_info * pci){
+    if ( ioctl(pci->fd, PERF_EVENT_IOC_DISABLE, 0) != 0){
+        printf("\ndisable wrong\n");
+        exit(EXIT_FAILURE);
     }
-    //some event may have triggered an event (process exit) that is not a valid sample
-    if (event_header->type!=PERF_RECORD_SAMPLE){
-      //just skip it for now
-      goto movenext;
-    }
-
-    printf("found a sample!\n");
-    //ok, we've got a valid sample, increment the event counter
-    event_count++;
-    //fall through to move_next
-
-  movenext:
-    //set this so we don't count this again
-    event_header=__move_one_record(event_header);
-  }
-
-  pci->ring_buffer_current=event_header;
-  return event_count;
+    close(pci->fd);
 }
