@@ -380,8 +380,10 @@ int __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_i
                 //the lowest must be notified
             }
         }
-        //set the group-level lowest ticks
-        group_info->lowest_ticks=__get_clock_ticks(group_info,group_info->lowest_tid);
+        if (group_info->lowest_tid>=0){
+            //set the group-level lowest ticks
+            group_info->lowest_ticks=__get_clock_ticks(group_info,group_info->lowest_tid);
+        }
 
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED) && defined(DEBUG_TASK_CLOCK_FINE_GRAINED)
         printk(KERN_EMERG "--------TASK CLOCK: lowest_notify_or_wait clock ticks %llu, id %d, waiting %d, lowest clock %d\n", 
@@ -614,6 +616,8 @@ void task_clock_entry_activate_other(struct task_clock_group_info * group_info, 
         group_info->clocks[id].ticks=0;
     }
     group_info->clocks[id].initialized=1;
+    group_info->clocks[id].ticks=0;
+    group_info->clocks[id].base_ticks=__get_clock_ticks(group_info, current->task_clock.tid) + 1;
     __clear_entry_state_by_id(group_info, id);
     __mark_as_active(group_info, id);
     //if the newly activated thread is the lowest, then we need to set a flag so userspace can deal with it. Since
