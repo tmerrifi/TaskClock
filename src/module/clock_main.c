@@ -578,7 +578,7 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
 #endif
   unsigned long flags;
   spin_lock_irqsave(&group_info->lock, flags);
-  //__set_base_ticks(group_info, current->task_clock.tid,group_info->lowest_ticks);
+  __set_base_ticks(group_info, current->task_clock.tid,group_info->lowest_ticks);
   __clear_entry_state(group_info);
   __mark_as_active(group_info, __current_tid());
   logical_clock_reset_overflow_period(group_info, __current_tid());
