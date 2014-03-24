@@ -238,6 +238,10 @@ int determ_task_clock_is_lowest_wait(){
     return polled;
 }
 
+int determ_task_clock_is_active(){
+    return task_clock_info.disabled;
+}
+
 void determ_task_clock_activate(){
     task_clock_info.user_status->lowest_clock=0;
     task_clock_info.disabled=0;

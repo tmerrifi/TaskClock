@@ -87,6 +87,7 @@
      void determ_task_clock_on_wakeup();
      int determ_task_clock_single_active_thread();
      void determ_task_clock_clear_single_active_thread();
+     int determ_task_clock_is_active();
      void determ_debugging_print_event();
      int determ_debugging_is_disabled();
      void determ_task_clock_close();
