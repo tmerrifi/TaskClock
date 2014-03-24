@@ -140,16 +140,6 @@ void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_l
             clock_debug_overflow[debug_counter_overflow].initialized[i]=group_info->clocks[i].initialized;
             clock_debug_overflow[debug_counter_overflow].inactive[i]=group_info->clocks[i].inactive;
             clock_debug_overflow[debug_counter_overflow].waiting[i]=group_info->clocks[i].waiting;
-            if (clock_debug_overflow[debug_counter_overflow].new_low_computed >= 0 && 
-                __get_clock_ticks(group_info,i) < __get_clock_ticks(group_info,clock_debug_overflow[debug_counter_overflow].new_low_computed) && 
-                group_info->clocks[i].initialized && !group_info->clocks[i].inactive){
-                printk(KERN_EMERG "UHOH...our ticks %llu, theirs %llu, new min %d", 
-                       __get_clock_ticks(group_info,i), 
-                       __get_clock_ticks(group_info,clock_debug_overflow[debug_counter_overflow].new_low_computed),
-                       clock_debug_overflow[debug_counter_overflow].new_low_computed);
-                __search_for_lowest_print(group_info);
-                __search_for_lowest_waiting_print(group_info);
-            }
         }
 
         ++debug_counter_overflow;
