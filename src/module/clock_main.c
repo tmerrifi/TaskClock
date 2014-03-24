@@ -568,6 +568,8 @@ void task_clock_entry_halt(struct task_clock_group_info * group_info){
   //make us inactive
   __mark_as_inactive(group_info, __current_tid());
   lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 13);
+  //clear the waiting flag...if its set we are not really "waiting"
+  group_info->clocks[__current_tid()].waiting=0;
   spin_unlock_irqrestore(&group_info->lock, flags);
   if (lowest_tid>=0){
       __wake_up_waiting_thread(group_info, lowest_tid);
@@ -580,7 +582,7 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
 #endif
   unsigned long flags;
   spin_lock_irqsave(&group_info->lock, flags);
-  __set_base_ticks(group_info, current->task_clock.tid,group_info->lowest_ticks);
+  //__set_base_ticks(group_info, current->task_clock.tid,group_info->lowest_ticks);
   __clear_entry_state(group_info);
   __mark_as_active(group_info, __current_tid());
   logical_clock_reset_overflow_period(group_info, __current_tid());
