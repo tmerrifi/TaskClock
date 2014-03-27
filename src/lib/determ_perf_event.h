@@ -295,6 +295,7 @@ struct perf_event_attr {
 #define PERF_EVENT_IOC_TASK_CLOCK_WOKE_UP _IO ('$', 13)
 #define PERF_EVENT_IOC_TASK_CLOCK_STOP _IO ('$', 14)
 #define PERF_EVENT_IOC_TASK_CLOCK_START _IO ('$', 15)
+#define PERF_EVENT_IOC_TASK_CLOCK_RESET _IO ('$', 16)
 
 enum perf_event_ioc_flags {
 	PERF_IOC_FLAG_GROUP		= 1U << 0,
