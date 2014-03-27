@@ -608,8 +608,8 @@ void task_clock_entry_activate_other(struct task_clock_group_info * group_info, 
         group_info->clocks[id].ticks=0;
     }
     group_info->clocks[id].initialized=1;
-    group_info->clocks[id].ticks=0;
-    group_info->clocks[id].base_ticks=__get_clock_ticks(group_info, current->task_clock.tid) + 1;
+    //group_info->clocks[id].ticks=0;
+    //group_info->clocks[id].base_ticks=__get_clock_ticks(group_info, current->task_clock.tid) + 1;
     __clear_entry_state_by_id(group_info, id);
     __mark_as_active(group_info, id);
     //if the newly activated thread is the lowest, then we need to set a flag so userspace can deal with it. Since
@@ -621,8 +621,6 @@ void task_clock_entry_activate_other(struct task_clock_group_info * group_info, 
     spin_unlock_irqrestore(&group_info->lock, flags);
 }
 
-//TODO:Need to remove this and from the kernel
-void task_clock_on_wait(struct task_clock_group_info * group_info){ }
 
 void task_clock_entry_wait(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
@@ -637,6 +635,10 @@ void task_clock_entry_wait(struct task_clock_group_info * group_info){
 
 }
 
+void task_clock_entry_reset(struct task_clock_group_info * group_info){
+    group_info->clocks[__current_tid()].initialized=0;
+}
+
 void task_clock_entry_sleep(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
     unsigned long flags;
@@ -646,11 +648,6 @@ void task_clock_entry_sleep(struct task_clock_group_info * group_info){
         group_info->clocks[current->task_clock.tid].sleeping=1;
     }
 
-    /*if (__current_tid()==1){
-        printk(KERN_EMERG "SLEEPING for %d\n", __current_tid());
-      __debug_print(group_info);
-      }*/
-    
     spin_unlock_irqrestore(&group_info->lock, flags);
     if (lowest_tid>=0){
         __wake_up_waiting_thread(group_info, lowest_tid);
@@ -703,7 +700,6 @@ int init_module(void)
   task_clock_func.task_clock_entry_halt=task_clock_entry_halt;
   task_clock_func.task_clock_on_disable=task_clock_on_disable;
   task_clock_func.task_clock_on_enable=task_clock_on_enable;
-  task_clock_func.task_clock_on_wait=task_clock_on_wait;
   task_clock_func.task_clock_entry_activate_other=task_clock_entry_activate_other;
   task_clock_func.task_clock_entry_wait=task_clock_entry_wait;
   task_clock_func.task_clock_entry_sleep=task_clock_entry_sleep;
@@ -713,6 +709,7 @@ int init_module(void)
   task_clock_func.task_clock_debug_add_event=task_clock_debug_add_event;
   task_clock_func.task_clock_entry_stop=task_clock_entry_stop;
   task_clock_func.task_clock_entry_start=task_clock_entry_start;
+  task_clock_func.task_clock_entry_reset=task_clock_entry_reset;
 
   debug_counter=0;
   debug_counter_overflow=0;
@@ -729,7 +726,6 @@ void cleanup_module(void)
   task_clock_func.task_clock_entry_halt=NULL;
   task_clock_func.task_clock_on_disable=NULL;
   task_clock_func.task_clock_on_enable=NULL;
-  task_clock_func.task_clock_on_wait=NULL;
   task_clock_func.task_clock_entry_activate_other=NULL;
   task_clock_func.task_clock_entry_wait=NULL;
   task_clock_func.task_clock_add_ticks=NULL;
