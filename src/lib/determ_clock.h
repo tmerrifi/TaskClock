@@ -91,6 +91,7 @@
      void determ_debugging_print_event();
      int determ_debugging_is_disabled();
      void determ_task_clock_close();
+     void determ_task_clock_reset();
      u_int32_t determ_task_get_id();
      int64_t determ_task_clock_estimate_next_tx(uint32_t id);
      u_int64_t determ_task_clock_get_last_tx_size();

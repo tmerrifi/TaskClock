@@ -154,6 +154,12 @@ u_int64_t determ_task_clock_read(){
     return task_clock_info.user_status->ticks;
 }
 
+void determ_task_clock_reset(){
+    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_RESET, 0) != 0){
+        printf("\nreset failed\n");
+        exit(EXIT_FAILURE);
+    }
+}
 
 void __woke_up(){
     if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_WOKE_UP, 0) != 0){
