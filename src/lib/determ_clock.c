@@ -283,7 +283,7 @@ int determ_task_clock_activate_other(int32_t id){
     return ret;
 }
 
-void determ_task_clock_start(){
+void __determ_task_clock_start(int start_type){
     uint64_t diff=0;
 #ifdef DEBUG_CLOCK_CACHE_PROFILE
     debug_clock_cache_insert(&task_clock_info.debug_clock_cache, determ_task_clock_read(), &diff);
@@ -302,11 +302,22 @@ void determ_task_clock_start(){
         perf_counter_start(&task_clock_info.perf_counter);
     }
     else{
-        if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_START) != 0){
+        if ( ioctl(task_clock_info.perf_counter.fd, start_type) != 0){
             printf("\nClock read failed\n");
             exit(EXIT_FAILURE);
         }
     }
+}
+
+void determ_task_clock_start(){
+    __determ_task_clock_start(PERF_EVENT_IOC_TASK_CLOCK_START);
+}
+
+//Start the clock, but don't use that as an opportunity to notify waiting threads. This is useful if we're
+//doing a coarsened transaction and don't care about the others. The reason we even do this is that its 
+//faster to avoid that overhead
+void determ_task_clock_start_no_notify(){
+    __determ_task_clock_start(PERF_EVENT_IOC_TASK_CLOCK_START_NO_NOTIFY);
 }
 
 u_int64_t determ_task_clock_get_last_tx_size(){
@@ -318,9 +329,14 @@ void determ_task_clock_stop(){
     determ_task_clock_stop_with_id(0);
 }
 
-void determ_task_clock_stop_with_id(uint32_t id){
+void determ_task_clock_stop_no_notify(){
+    __determ_task_clock_stop_with_id(0, PERF_EVENT_IOC_TASK_CLOCK_STOP_NO_NOTIFY);
+}
+
+
+void __determ_task_clock_stop_with_id(uint32_t id, int stop_type){
     //read the clock
-    if ( ioctl(task_clock_info.perf_counter.fd, PERF_EVENT_IOC_TASK_CLOCK_STOP) != 0){
+    if ( ioctl(task_clock_info.perf_counter.fd, stop_type) != 0){
         printf("\nClock read failed\n");
         exit(EXIT_FAILURE);
     }
@@ -336,6 +352,16 @@ void determ_task_clock_stop_with_id(uint32_t id){
         determ_task_clock_add_ticks(diff);
     }
 #endif
+}
+
+void determ_task_clock_stop_with_id(uint32_t id){
+    __determ_task_clock_stop_with_id(id, PERF_EVENT_IOC_TASK_CLOCK_STOP);
+}
+
+//Stop and read the clock...but don't do extra work in the kernel to wake someone up. Minor optimization
+//to speed up coarsened transactions
+void determ_task_clock_stop_with_id_no_notify(uint32_t id){
+    __determ_task_clock_stop_with_id(id, PERF_EVENT_IOC_TASK_CLOCK_STOP_NO_NOTIFY);
 }
 
 int64_t determ_task_clock_estimate_next_tx(uint32_t id){

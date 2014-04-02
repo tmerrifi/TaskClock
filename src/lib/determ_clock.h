@@ -78,8 +78,11 @@
      int determ_task_clock_is_lowest_wait();
      int determ_task_clock_is_lowest();
      void determ_task_clock_start();
+     void determ_task_clock_start_no_notify();
      void determ_task_clock_stop_with_id(uint32_t id);
      void determ_task_clock_stop();
+     void determ_task_clock_stop_no_notify();
+     void determ_task_clock_stop_with_id_no_notify(uint32_t id);
      void determ_task_clock_halt();
      void determ_task_clock_activate();
      int determ_task_clock_activate_other(int32_t id);

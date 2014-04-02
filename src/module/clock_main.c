@@ -684,11 +684,21 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
     }
 }
 
+//just like regular stop, just don't try and wake any one up. Or grab the lock!
+void task_clock_entry_stop_no_notify(struct task_clock_group_info * group_info){
+    logical_clock_read_clock_and_update(group_info, __current_tid());
+}
+
 //lets start caring about the ticks we see (again)
 void task_clock_entry_start(struct task_clock_group_info * group_info){
     //the clock may have continued to run...so reset the ticks we've seen
     logical_clock_reset_current_ticks(group_info,__current_tid());
     task_clock_on_enable(group_info);
+}
+
+void task_clock_entry_start_no_notify(struct task_clock_group_info * group_info){
+    //the clock may have continued to run...so reset the ticks we've seen
+    logical_clock_reset_current_ticks(group_info,__current_tid());
 }
 
 int init_module(void)

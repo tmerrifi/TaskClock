@@ -39,6 +39,7 @@ void perf_counter_init(u_int32_t sample_period, int32_t group_fd, struct perf_co
   //pe.type = PERF_TYPE_RAW;
   pe.size = sizeof(struct perf_event_attr);
   pe.config = PERF_COUNT_HW_INSTRUCTIONS;
+  //pe.config = PERF_COUNT_CPU_CYCLES;
   //pe.config = (0x0BULL) | (0x0200ULL);
   pe.disabled = 1;
   pe.exclude_kernel = 1;
