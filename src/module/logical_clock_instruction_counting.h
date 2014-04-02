@@ -63,6 +63,7 @@ static inline void logical_clock_reset_current_ticks(struct task_clock_group_inf
 }
 
 static inline void logical_clock_update_overflow_period(struct task_clock_group_info * group_info, int id){
+#ifdef USE_ADAPTIVE_OVERFLOW_PERIOD
     uint64_t lowest_waiting_tid_clock, myclock, new_sample_period;
     int32_t lowest_waiting_tid=0;    
 
@@ -80,11 +81,14 @@ static inline void logical_clock_update_overflow_period(struct task_clock_group_
         group_info->clocks[id].debug_last_sample_period = group_info->clocks[id].event->hw.sample_period;
         group_info->clocks[id].event->hw.sample_period =  __min(new_sample_period, MAX_CLOCK_SAMPLE_PERIOD);
     }
+#endif
 }
 
 static inline void logical_clock_reset_overflow_period(struct task_clock_group_info * group_info, int id){
+#ifdef USE_ADAPTIVE_OVERFLOW_PERIOD
     group_info->clocks[current->task_clock.tid].event->hw.sample_period=0;
     local64_set(&group_info->clocks[current->task_clock.tid].event->hw.period_left,0);
+#endif
 }
 
 

@@ -58,8 +58,10 @@
    };
 
 
-   //how many instructions to count before generating a sample
+     //how many instructions to count before generating a sample
+#ifndef DETERM_CLOCK_SAMPLE_PERIOD
 #define DETERM_CLOCK_SAMPLE_PERIOD 5000
+#endif
 
 #define DETERM_CLOCK_NOT_WAITING 0
 #define DETERM_CLOCK_LOWEST 1
