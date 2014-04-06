@@ -539,7 +539,6 @@ struct task_clock_group_info * task_clock_group_init(void){
   group_info->nmi_new_low=0;
   group_info->user_status_arr=NULL;
   group_info->active_threads = kmalloc(sizeof(struct listarray), GFP_KERNEL);
-  printk(KERN_EMERG "listarray_init, size %d \n", sizeof(struct listarray));
   listarray_init(group_info->active_threads);
   __init_task_clock_entries(group_info);
   init_irq_work(&group_info->pending_work, __task_clock_notify_waiting_threads_irq);
@@ -744,8 +743,6 @@ void cleanup_module(void)
   task_clock_func.task_clock_entry_stop=NULL;
   task_clock_func.task_clock_entry_start=NULL;
 
-  printk(KERN_EMERG " counter %d\n",  debug_counter_overflow);
-  
   //__clock_debug_print_overflow(); 
 
 }
