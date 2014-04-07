@@ -122,8 +122,15 @@ void determ_task_clock_init_with_id(u_int32_t id){
 #if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
     debug_clock_cache_init(task_clock_info.tid, &task_clock_info.debug_clock_cache);
 #endif
-
+    //set the scaling factor
+    determ_task_set_scaling_factor(1,0);
 }
+
+void determ_task_set_scaling_factor(uint8_t whole, uint8_t fraction){
+    task_clock_info.user_status->scaling_whole=whole;
+    task_clock_info.user_status->scaling_fraction=fraction;
+}
+
 
 int determ_task_clock_single_active_thread(){
     return task_clock_info.user_status->single_active_thread;

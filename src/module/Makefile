@@ -11,10 +11,11 @@ task_clock-y = clock_main.o
 #adjust the period for the instruction counting at runtime
 #-DUSE_ADAPTIVE_OVERFLOW_PERIOD
 
-KBUILD_CFLAGS += -g -O3 #-DUSE_ADAPTIVE_OVERFLOW_PERIOD
+KBUILD_CFLAGS += -g -O3 -DUSE_ADAPTIVE_OVERFLOW_PERIOD
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 clean:
+
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean

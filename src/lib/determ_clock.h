@@ -32,6 +32,7 @@
        //thread that thought *they* were the lowest. Setting this flag means we need to tell those
        //threads that their view of the world needs to be refreshed.
        u_int8_t activated_lowest;
+       uint8_t scaling_whole, scaling_fraction;
    } __attribute__ ((aligned (8), packed));
 
    struct determ_task_clock_info{
@@ -101,6 +102,8 @@
      int64_t determ_task_clock_estimate_next_tx(uint32_t id);
      u_int64_t determ_task_clock_get_last_tx_size();
      struct determ_task_clock_info determ_task_clock_get_info();
+     void determ_task_set_scaling_factor(uint8_t whole, uint8_t fraction);
+
 #endif
 
 #ifdef __cplusplus

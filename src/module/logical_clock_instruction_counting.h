@@ -12,7 +12,7 @@
     unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); \
     group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         \
     if (rawcount < 0) printk(KERN_EMERG "UHOH, %d\n",tid); \
-    group_info->clocks[tid].ticks+=rawcount; \ 
+    __inc_clock_ticks(group_info, tid, rawcount); \ 
     local64_set(&group_info->clocks[tid].event->count, 0);
 
 //utility function to read the performance counter
