@@ -33,6 +33,8 @@
        //threads that their view of the world needs to be refreshed.
        u_int8_t activated_lowest;
        uint8_t scaling_whole, scaling_fraction;
+       //keeps the hw perf counter index to read the counter in userspace
+       uint32_t hwc_idx; 
    } __attribute__ ((aligned (8), packed));
 
    struct determ_task_clock_info{
@@ -42,7 +44,9 @@
        u_int8_t disabled;
        struct debug_clock_cache debug_clock_cache; //cache of clock values to use (for debugging)
        u_int64_t last_clock_value;
+       u_int64_t coarsened_ticks_counter;
        struct tx_estimator estimator;
+       u_int8_t in_coarsened_tx;
    };
 
    struct determ_clock_info{
@@ -68,7 +72,14 @@
 #define DETERM_CLOCK_LOWEST 1
 #define DETERM_CLOCK_WAITING 2
 
-     
+#define TASK_CLOCK_OP_STOP 1
+#define TASK_CLOCK_OP_START 2
+#define TASK_CLOCK_OP_START_COARSENED 3
+
+#define TASK_CLOCK_COARSENED 1
+#define TASK_CLOCK_NOT_COARSENED 2     
+
+
      static void determ_clock_init();
      void determ_task_clock_init();
      void determ_task_clock_init_with_id(u_int32_t id);
@@ -103,6 +114,9 @@
      u_int64_t determ_task_clock_get_last_tx_size();
      struct determ_task_clock_info determ_task_clock_get_info();
      void determ_task_set_scaling_factor(uint8_t whole, uint8_t fraction);
+     void determ_task_clock_end_coarsened_tx();
+     uint64_t determ_task_clock_get_coarsened_ticks();
+     struct task_clock_user_status * determ_task_clock_get_userspace_info();
 
 #endif
 

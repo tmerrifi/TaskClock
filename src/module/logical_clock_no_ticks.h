@@ -12,4 +12,6 @@
 
 #define logical_clock_reset_overflow_period(group_info, id)
 
+#define logical_clock_set_perf_counter_max(group_info, id)
+
 #endif

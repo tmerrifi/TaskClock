@@ -453,7 +453,6 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
     if (lowest_tid>=0){           
         __wake_up_waiting_thread(group_info, lowest_tid);
     }
-
 }
 
 void __init_task_clock_entries(struct task_clock_group_info * group_info){
@@ -522,6 +521,8 @@ void task_clock_entry_init(struct task_clock_group_info * group_info, struct per
         void * mapped_page_addr=vmap(&p, 1, VM_MAP, PAGE_KERNEL);
         group_info->user_status_arr=(struct task_clock_user_status *)(mapped_page_addr+page_offset);
     }
+    current->task_clock.group_info=group_info;
+    current->task_clock.user_status->hwc_idx=-1;
 
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
   printk(KERN_EMERG "TASK CLOCK: INIT, tid %d event is %p....ticks are %llu \n", 
@@ -669,6 +670,8 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
     uint64_t new_raw_count, prev_raw_count;
     int64_t delta;
     int lowest_tid=-1;
+    int profile=0;
+
     //read the counter and update our clock
     logical_clock_read_clock_and_update(group_info, __current_tid());
     
@@ -677,10 +680,6 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
 
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 787);
     spin_unlock_irqrestore(&group_info->lock, flags);
-
-    if (lowest_tid>=0){
-        __wake_up_waiting_thread(group_info, lowest_tid);
-    }
 }
 
 //just like regular stop, just don't try and wake any one up. Or grab the lock!
@@ -698,6 +697,11 @@ void task_clock_entry_start(struct task_clock_group_info * group_info){
 void task_clock_entry_start_no_notify(struct task_clock_group_info * group_info){
     //the clock may have continued to run...so reset the ticks we've seen
     logical_clock_reset_current_ticks(group_info,__current_tid());
+    //now that its reset, lets set the counter to be VERY HIGH...if we get beat by an overflow its ok
+    //because we've already reset the counter
+    logical_clock_set_perf_counter_max(group_info,__current_tid());
+    //turn off overflows...just in case
+    __tick_counter_turn_off(group_info);
 }
 
 int init_module(void)
@@ -719,6 +723,8 @@ int init_module(void)
   task_clock_func.task_clock_entry_stop=task_clock_entry_stop;
   task_clock_func.task_clock_entry_start=task_clock_entry_start;
   task_clock_func.task_clock_entry_reset=task_clock_entry_reset;
+  task_clock_func.task_clock_entry_start_no_notify=task_clock_entry_start_no_notify;
+  task_clock_func.task_clock_entry_stop_no_notify=task_clock_entry_stop_no_notify;
 
   debug_counter=0;
   debug_counter_overflow=0;

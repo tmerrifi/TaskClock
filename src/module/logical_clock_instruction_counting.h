@@ -8,19 +8,40 @@
 //whats the minimum overflow period
 #define MIN_CLOCK_SAMPLE_PERIOD 1024
 
-#define logical_clock_update_clock_ticks(group_info, tid)                           \
-    unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); \
-    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         \
-    if (rawcount < 0) printk(KERN_EMERG "UHOH, %d\n",tid); \
-    __inc_clock_ticks(group_info, tid, rawcount); \ 
+//The value bits in the counter...this is very much model specific
+#define X86_CNT_VAL_BITS 48
+
+#define X86_CNT_VAL_MASK (1ULL << X86_CNT_VAL_BITS) - 1
+
+static inline void logical_clock_update_clock_ticks(struct task_clock_group_info * group_info, int tid){
+    unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); 
+    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         
+
+    if (tid==0 && tid==1){
+
+        printk(KERN_EMERG " HUH 2 ????? %lld id %d current clock %llu userspace addr %p userspace %llu\n", 
+               rawcount, tid , __get_clock_ticks(group_info, tid), &current->task_clock.user_status->ticks, current->task_clock.user_status->ticks);
+
+    }
+
+    __inc_clock_ticks(group_info, tid, rawcount); 
     local64_set(&group_info->clocks[tid].event->count, 0);
+}
 
 //utility function to read the performance counter
-static inline void __read_performance_counter(struct hw_perf_event * hwc, uint64_t * _new_raw_count, uint64_t * _prev_raw_count){
-    uint64_t new_raw_count, prev_raw_count;
+static inline void __read_performance_counter(struct hw_perf_event * hwc, uint64_t * _new_raw_count, uint64_t * _prev_raw_count, uint64_t * _new_pmc){
+    uint64_t new_raw_count, prev_raw_count, new_pmc;
+
+    DECLARE_ARGS(val, low, high);
+
  again:    
     //read the raw counter
     rdmsrl(hwc->event_base + hwc->idx, new_raw_count);
+
+    asm volatile("rdpmc" : EAX_EDX_RET(val, low, high) : "c" (hwc->idx));
+    new_pmc=EAX_EDX_VAL(val, low, high);
+    
+
     //get previous count
     prev_raw_count = local64_read(&hwc->prev_count);
     //in case an NMI fires while we're doing this...unlikely but who knows?!
@@ -30,17 +51,18 @@ static inline void __read_performance_counter(struct hw_perf_event * hwc, uint64
     //set the arguments to the values read
     *_new_raw_count=new_raw_count;
     *_prev_raw_count=prev_raw_count;
+    *_new_pmc=new_pmc;
 }
 
 static inline void logical_clock_read_clock_and_update(struct task_clock_group_info * group_info, int id){
-    uint64_t new_raw_count, prev_raw_count;
+    uint64_t new_raw_count, prev_raw_count, new_pmc;
     int64_t delta;
     //for our version of perf counters (v3 for Intel) this works...probably not for anything else
     //ARCH_DEP_TODO
-    int shift = 16;
+    int shift = 64 - X86_CNT_VAL_BITS;
     struct hw_perf_event * hwc = &group_info->clocks[id].event->hw;
     //read the counters using rdmsr
-    __read_performance_counter(hwc, &new_raw_count, &prev_raw_count);
+    __read_performance_counter(hwc, &new_raw_count, &prev_raw_count, &new_pmc);
     //if this succeeds, then its safe to turn off the tick_counter...meaning we no longer do work inside the overflow handler.
     //Even if an NMI beats us to it...it won't have any work to do since prev_raw_count==new_raw_count after the cmpxchg
     __tick_counter_turn_off(group_info);
@@ -48,6 +70,12 @@ static inline void logical_clock_read_clock_and_update(struct task_clock_group_i
     delta = (new_raw_count << shift) - (prev_raw_count << shift);
     //shift it back to get the actually correct number
     delta >>= shift;
+    if (id==0 && id==1){
+        printk(KERN_EMERG " HUH????? %lld id %d current clock %llu userspace addr %p userspace %llu\n", 
+               delta, id , __get_clock_ticks(group_info, id), &current->task_clock.user_status->ticks, current->task_clock.user_status->ticks);
+    }
+    //printk(KERN_EMERG " raw counter: %llu %llu %llu %llu idx %d tid %d new prev %llu\n", 
+    //       ((new_raw_count << shift)>>shift), ((new_pmc << shift)>>shift), ((prev_raw_count << shift)>>shift), delta, hwc->idx, __current_tid(), local64_read(&hwc->prev_count));
     //add it to our current clock
     __inc_clock_ticks(group_info, id, delta);
     //let userspace see it
@@ -55,11 +83,20 @@ static inline void logical_clock_read_clock_and_update(struct task_clock_group_i
 }
 
 static inline void logical_clock_reset_current_ticks(struct task_clock_group_info * group_info, int id){
-    uint64_t new_raw_count, prev_raw_count;
+    uint64_t new_raw_count, prev_raw_count, new_pmc;
     //we can just read the counter...since that will effectively reset it
-    __read_performance_counter(&group_info->clocks[id].event->hw, &new_raw_count, &prev_raw_count);
+    __read_performance_counter(&group_info->clocks[id].event->hw, &new_raw_count, &prev_raw_count, &new_pmc);
     //reset the event's counter to 0
     local64_set(&group_info->clocks[id].event->count, 0);
+}
+
+static inline logical_clock_set_perf_counter_max(struct task_clock_group_info * group_info, int id){
+    struct hw_perf_event * hwc = &group_info->clocks[id].event->hw;
+    int64_t val = (1ULL << 31) - 1;
+    wrmsrl(hwc->event_base + hwc->idx, (uint64_t)(-val) & X86_CNT_VAL_MASK);
+    //what did we set the counter to?
+    //printk(KERN_EMERG " new counter: %llu\n", (uint64_t)(-val) & X86_CNT_VAL_MASK);
+
 }
 
 static inline void logical_clock_update_overflow_period(struct task_clock_group_info * group_info, int id){

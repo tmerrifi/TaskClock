@@ -23,11 +23,18 @@ struct determ_clock_info * clock_info;
 struct determ_task_clock_info task_clock_info;
 
 #if __x86_64__
-/* 64-bit */
 #define __TASK_CLOCK_SYS_CALL 304
 #else
 #define __TASK_CLOCK_SYS_CALL 342
 #endif
+
+#if __x86_64__
+#define __TASK_CLOCK_DO_SYS_CALL 306
+#else
+#define __TASK_CLOCK_DO_SYS_CALL 344
+#endif
+
+#define MAX_CLOCK_VAL ((1ULL << 31) - 1)
 
 #define MAX_SPIN_INT 1000
 
@@ -35,10 +42,17 @@ struct determ_task_clock_info determ_task_clock_get_info(){
     return task_clock_info;
 }
 
+struct task_clock_user_status * determ_task_clock_get_userspace_info(){
+    return task_clock_info.user_status;
+}
+
 //making a simple system call to let the kernel know where the tick array is located
 void __make_clock_sys_call(void * address, size_t tid, size_t fd){
-  struct ftracer * tracer;
   syscall(__TASK_CLOCK_SYS_CALL, fd, (unsigned long)address, tid);
+}
+
+void __sys_task_clock_do(uint32_t operation, uint64_t value){
+    syscall(__TASK_CLOCK_DO_SYS_CALL, operation, value);
 }
 
 //sick of writing this boiler plate mmap code! :( Oh well!
@@ -113,7 +127,9 @@ void determ_task_clock_init_with_id(u_int32_t id){
     memset(task_clock_info.user_status, 0, sizeof(struct task_clock_user_status));
     task_clock_info.disabled=0;
     //set the last clock value to zero
-    task_clock_info.last_clock_value=0;
+    task_clock_info.last_clock_value=0ULL;
+    task_clock_info.coarsened_ticks_counter=0ULL;
+    task_clock_info.in_coarsened_tx=0;
     tx_estimate_init(&task_clock_info.estimator);
     //set up the task clock for our process
     __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
@@ -158,7 +174,7 @@ int determ_debug_notifying_diff_read(){
 
 
 u_int64_t determ_task_clock_read(){
-    return task_clock_info.user_status->ticks;
+    return task_clock_info.user_status->ticks + task_clock_info.coarsened_ticks_counter;
 }
 
 void determ_task_clock_reset(){
@@ -290,6 +306,13 @@ int determ_task_clock_activate_other(int32_t id){
     return ret;
 }
 
+uint64_t __rdpmc(uint32_t reg)
+{
+    uint64_t val;
+    asm("rdpmc" : "=A" (val) : "c" (reg));    
+    return val;
+}
+
 void __determ_task_clock_start(int start_type){
     uint64_t diff=0;
 #ifdef DEBUG_CLOCK_CACHE_PROFILE
@@ -299,54 +322,84 @@ void __determ_task_clock_start(int start_type){
 #endif
     task_clock_info.disabled=0;
     task_clock_info.user_status->lowest_clock=0;
-    //set the last clock read so we can figure out later the length of the tx in instructions
-    task_clock_info.last_clock_value=determ_task_clock_read();
-    if (diff>0){
-        determ_task_clock_add_ticks(diff);
-    }
-    
-    if (!task_clock_info.perf_counter.started){
-        perf_counter_start(&task_clock_info.perf_counter);
+
+    if (start_type!=TASK_CLOCK_COARSENED){
+        //set the last clock read so we can figure out later the length of the tx in instructions
+        task_clock_info.last_clock_value=determ_task_clock_read();
+        if (diff>0){
+            determ_task_clock_add_ticks(diff);
+        }
+        
+        if (!task_clock_info.perf_counter.started){
+            perf_counter_start(&task_clock_info.perf_counter);
+        }
+        else{
+            __sys_task_clock_do(TASK_CLOCK_OP_START, 0);
+            /*if ( ioctl(task_clock_info.perf_counter.fd, start_type) != 0){
+              printf("\nClock read failed\n");
+              exit(EXIT_FAILURE);
+              }*/
+        }
     }
     else{
-        if ( ioctl(task_clock_info.perf_counter.fd, start_type) != 0){
-            printf("\nClock read failed\n");
-            exit(EXIT_FAILURE);
-        }
+        //we are STARTING a coarsened tx (the first one in the block)
+        __sys_task_clock_do(TASK_CLOCK_OP_START_COARSENED, 0);
+        uint64_t new_raw = __rdpmc(task_clock_info.user_status->hwc_idx);
     }
 }
 
+uint64_t determ_task_clock_get_coarsened_ticks(){
+    return task_clock_info.coarsened_ticks_counter;
+}
+
+void determ_task_clock_end_coarsened_tx(){
+    if (task_clock_info.coarsened_ticks_counter > 0){
+        determ_task_clock_add_ticks(task_clock_info.coarsened_ticks_counter);
+    }
+    task_clock_info.in_coarsened_tx=0;
+    task_clock_info.coarsened_ticks_counter=0;
+}
+
 void determ_task_clock_start(){
-    __determ_task_clock_start(PERF_EVENT_IOC_TASK_CLOCK_START);
+    __determ_task_clock_start(TASK_CLOCK_NOT_COARSENED);
 }
 
 //Start the clock, but don't use that as an opportunity to notify waiting threads. This is useful if we're
 //doing a coarsened transaction and don't care about the others. The reason we even do this is that its 
 //faster to avoid that overhead
 void determ_task_clock_start_no_notify(){
-    __determ_task_clock_start(PERF_EVENT_IOC_TASK_CLOCK_START_NO_NOTIFY);
+    if (!task_clock_info.in_coarsened_tx){
+        __determ_task_clock_start(TASK_CLOCK_COARSENED);
+        //we've now set the counter to be the max allowable size...we can now read the counter in userspace
+        task_clock_info.in_coarsened_tx=1;
+    }
 }
 
 u_int64_t determ_task_clock_get_last_tx_size(){
     return determ_task_clock_read() - task_clock_info.last_clock_value;
 }
 
-
-void determ_task_clock_stop(){
-    determ_task_clock_stop_with_id(0);
-}
-
-void determ_task_clock_stop_no_notify(){
-    __determ_task_clock_stop_with_id(0, PERF_EVENT_IOC_TASK_CLOCK_STOP_NO_NOTIFY);
-}
-
-
 void __determ_task_clock_stop_with_id(uint32_t id, int stop_type){
     //read the clock
-    if ( ioctl(task_clock_info.perf_counter.fd, stop_type) != 0){
+    /*if ( ioctl(task_clock_info.perf_counter.fd, stop_type) != 0){
         printf("\nClock read failed\n");
         exit(EXIT_FAILURE);
+        }*/
+
+    if (stop_type==TASK_CLOCK_NOT_COARSENED){
+        __sys_task_clock_do(TASK_CLOCK_OP_STOP, 0);
     }
+    else{
+        uint64_t new_raw = __rdpmc(task_clock_info.user_status->hwc_idx);
+        uint64_t max_raw = (uint64_t)(-((int64_t)MAX_CLOCK_VAL));
+        uint64_t shift = 16ULL;
+        uint64_t delta = (new_raw << shift) - (max_raw << shift);
+        //shift it back to get the actually correct number
+        delta >>= shift;
+        //add the delta to the ticks
+        task_clock_info.coarsened_ticks_counter+=delta;
+    }
+
     tx_estimate_add_observation(&task_clock_info.estimator, id, determ_task_clock_get_last_tx_size());
 #if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
     uint64_t diff=0;
@@ -361,14 +414,22 @@ void __determ_task_clock_stop_with_id(uint32_t id, int stop_type){
 #endif
 }
 
+void determ_task_clock_stop(){
+    determ_task_clock_stop_with_id(0);
+}
+
+void determ_task_clock_stop_no_notify(){
+    determ_task_clock_stop_with_id_no_notify(0);
+}
+
 void determ_task_clock_stop_with_id(uint32_t id){
-    __determ_task_clock_stop_with_id(id, PERF_EVENT_IOC_TASK_CLOCK_STOP);
+    __determ_task_clock_stop_with_id(id, TASK_CLOCK_NOT_COARSENED);
 }
 
 //Stop and read the clock...but don't do extra work in the kernel to wake someone up. Minor optimization
 //to speed up coarsened transactions
 void determ_task_clock_stop_with_id_no_notify(uint32_t id){
-    __determ_task_clock_stop_with_id(id, PERF_EVENT_IOC_TASK_CLOCK_STOP_NO_NOTIFY);
+    __determ_task_clock_stop_with_id(id, TASK_CLOCK_COARSENED);
 }
 
 int64_t determ_task_clock_estimate_next_tx(uint32_t id){
