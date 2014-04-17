@@ -275,6 +275,11 @@ void __task_clock_notify_waiting_threads_irq(struct irq_work * work){
 void task_clock_entry_overflow_update_period(struct task_clock_group_info * group_info){
     unsigned long flags;
 
+    if (current->task_clock.user_status->notifying_id==666){
+        printk(KERN_EMERG "UHOH %lld\n", logical_clock_raw_read_pmc(group_info, __current_tid()));
+    }
+
+
     //if we don't want to count ticks...don't do any of this work.
     if (!__tick_counter_is_running(group_info)){
         return;
@@ -300,6 +305,8 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   if (!__tick_counter_is_running(group_info)){
       return;
   }
+
+  
 
   //spin_lock_irqsave(&group_info->nmi_lock, flags);
   new_low=__new_lowest(group_info, current->task_clock.tid);
@@ -680,6 +687,10 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
 
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 787);
     spin_unlock_irqrestore(&group_info->lock, flags);
+
+    if (lowest_tid>=0){
+        __wake_up_waiting_thread(group_info, lowest_tid);
+    }
 }
 
 //just like regular stop, just don't try and wake any one up. Or grab the lock!
@@ -692,6 +703,7 @@ void task_clock_entry_start(struct task_clock_group_info * group_info){
     //the clock may have continued to run...so reset the ticks we've seen
     logical_clock_reset_current_ticks(group_info,__current_tid());
     task_clock_on_enable(group_info);
+    current->task_clock.user_status->notifying_id=0;
 }
 
 void task_clock_entry_start_no_notify(struct task_clock_group_info * group_info){
@@ -702,6 +714,8 @@ void task_clock_entry_start_no_notify(struct task_clock_group_info * group_info)
     logical_clock_set_perf_counter_max(group_info,__current_tid());
     //turn off overflows...just in case
     __tick_counter_turn_off(group_info);
+    current->task_clock.user_status->notifying_id=666;
+    //printk(KERN_EMERG "Max? %lld\n", logical_clock_raw_read_pmc(group_info, __current_tid()));
 }
 
 int init_module(void)

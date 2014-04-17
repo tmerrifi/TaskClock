@@ -117,6 +117,7 @@
      void determ_task_clock_end_coarsened_tx();
      uint64_t determ_task_clock_get_coarsened_ticks();
      struct task_clock_user_status * determ_task_clock_get_userspace_info();
+     //uint64_t determ_task_clock_raw
 
 #endif
 

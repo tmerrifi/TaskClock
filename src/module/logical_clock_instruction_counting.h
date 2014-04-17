@@ -54,6 +54,15 @@ static inline void __read_performance_counter(struct hw_perf_event * hwc, uint64
     *_new_pmc=new_pmc;
 }
 
+static inline uint64_t logical_clock_raw_read_pmc(struct task_clock_group_info * group_info, int id){
+    uint64_t raw_val;
+    DECLARE_ARGS(val, low, high);
+    struct hw_perf_event * hwc = &group_info->clocks[id].event->hw;
+    asm volatile("rdpmc" : EAX_EDX_RET(val, low, high) : "c" (hwc->idx));
+    raw_val=EAX_EDX_VAL(val, low, high);
+    return ((raw_val << (64 - X86_CNT_VAL_BITS)) >> (64 - X86_CNT_VAL_BITS));
+}
+
 static inline void logical_clock_read_clock_and_update(struct task_clock_group_info * group_info, int id){
     uint64_t new_raw_count, prev_raw_count, new_pmc;
     int64_t delta;
@@ -93,7 +102,7 @@ static inline void logical_clock_reset_current_ticks(struct task_clock_group_inf
 static inline logical_clock_set_perf_counter_max(struct task_clock_group_info * group_info, int id){
     struct hw_perf_event * hwc = &group_info->clocks[id].event->hw;
     int64_t val = (1ULL << 31) - 1;
-    wrmsrl(hwc->event_base + hwc->idx, (uint64_t)(-val) & X86_CNT_VAL_MASK);
+    wrmsrl(hwc->event_base + hwc->idx, ((uint64_t)(-val) & X86_CNT_VAL_MASK));
     //what did we set the counter to?
     //printk(KERN_EMERG " new counter: %llu\n", (uint64_t)(-val) & X86_CNT_VAL_MASK);
 
