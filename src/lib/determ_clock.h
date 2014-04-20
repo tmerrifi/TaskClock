@@ -35,6 +35,7 @@
        uint8_t scaling_whole, scaling_fraction;
        //keeps the hw perf counter index to read the counter in userspace
        uint32_t hwc_idx; 
+       uint64_t period_sets;
    } __attribute__ ((aligned (8), packed));
 
    struct determ_task_clock_info{
@@ -47,6 +48,8 @@
        u_int64_t coarsened_ticks_counter;
        struct tx_estimator estimator;
        u_int8_t in_coarsened_tx;
+       u_int64_t last_raw_perf;
+       u_int64_t current_raw_perf;
    };
 
    struct determ_clock_info{
@@ -117,7 +120,10 @@
      void determ_task_clock_end_coarsened_tx();
      uint64_t determ_task_clock_get_coarsened_ticks();
      struct task_clock_user_status * determ_task_clock_get_userspace_info();
-     //uint64_t determ_task_clock_raw
+     uint64_t determ_task_clock_last_raw_perf();
+     uint64_t determ_task_clock_current_raw_perf();
+     uint64_t determ_task_clock_period_sets();
+     int determ_task_clock_in_coarsened_tx();
 
 #endif
 

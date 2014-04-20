@@ -49,15 +49,17 @@ struct clock_debug{
     uint64_t sample_rate;
     uint64_t prev_count;
     int nmi_new_low;
+    uint64_t last_written;
 };
 
-#define clock_debug_max_entries 2500
+#define clock_debug_max_entries 50
 
 struct clock_debug clock_debug[clock_debug_max_entries];
 struct clock_debug clock_debug_overflow[clock_debug_max_entries];
 
 int debug_counter;
-int debug_counter_overflow;;
+int debug_counter_overflow;
+int start_counter;
 
 
 int __lowest_time(struct timespec * t1, struct timespec * t2){
@@ -113,6 +115,8 @@ void __clock_debug(struct task_clock_group_info * group_info, int new_low, int e
         clock_debug[debug_counter].current_id = current->task_clock.tid;
         clock_debug[debug_counter].current_is_lowest = group_info->user_status_arr[current->task_clock.tid].lowest_clock;
         clock_debug[debug_counter].sample_rate = group_info->clocks[current->task_clock.tid].event->hw.sample_period;
+        clock_debug[debug_counter].last_written =  group_info->clocks[__current_tid()].event->last_written;
+        
         
         ++debug_counter;
     }
@@ -132,7 +136,7 @@ void __clock_debug_overflow(struct task_clock_group_info * group_info, int new_l
         clock_debug_overflow[debug_counter_overflow].prev_count =  
             local64_read(&group_info->clocks[__current_tid()].event->count);  //local64_read(&hwc->prev_count);
         clock_debug_overflow[debug_counter_overflow].nmi_new_low=group_info->nmi_new_low;
-
+        clock_debug_overflow[debug_counter_overflow].last_written = group_info->clocks[__current_tid()].event->last_written;
         int i=0;
         for (;i<DEBUG_THREAD_COUNT;++i){
             clock_debug_overflow[debug_counter_overflow].clocks[i]=__get_clock_ticks(group_info, i);
@@ -153,7 +157,7 @@ void task_clock_debug_add_event(struct task_clock_group_info * group_info, int32
 }
 
 void __clock_debug_print(void){
-    int i=300;
+    int i=0;
     for (;i<debug_counter;++i){
         int j=0;
         for (;j<DEBUG_THREAD_COUNT;++j){
@@ -177,11 +181,11 @@ void __clock_debug_print_overflow(void){
                    clock_debug_overflow[i].initialized[j], clock_debug_overflow[i].inactive[j], 
                    clock_debug_overflow[i].waiting[j]);
         }
-        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d, sample: %lu, prev_count: %lu, nmi_new_low: %d", 
+        printk(KERN_EMERG " new_low: %d, new_low_computed: %d, lowest_clock %lu, event: %d, current: %d, sample: %lu, prev_count: %lu, nmi_new_low: %d, last written: %llu", 
                clock_debug_overflow[i].new_low, clock_debug_overflow[i].new_low_computed, 
                clock_debug_overflow[i].lowest_clock, clock_debug_overflow[i].event, 
                clock_debug_overflow[i].current_id, clock_debug_overflow[i].sample_rate,
-               clock_debug_overflow[i].prev_count, clock_debug_overflow[i].nmi_new_low);
+               clock_debug_overflow[i].prev_count, clock_debug_overflow[i].nmi_new_low, clock_debug_overflow[i].last_written);
         char active_str[256];
         int counter=0;
         for (j=0;j<32;++j){
@@ -276,7 +280,7 @@ void task_clock_entry_overflow_update_period(struct task_clock_group_info * grou
     unsigned long flags;
 
     if (current->task_clock.user_status->notifying_id==666){
-        printk(KERN_EMERG "UHOH %lld\n", logical_clock_raw_read_pmc(group_info, __current_tid()));
+        __clock_debug_overflow(group_info, 0, 666);
     }
 
 
@@ -445,7 +449,12 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
     logical_clock_reset_overflow_period(group_info, __current_tid());
     //__update_period(group_info);
     logical_clock_update_overflow_period(group_info, __current_tid());
-    
+
+    if (group_info->clocks[current->task_clock.tid].userspace_reading==1){
+        group_info->clocks[current->task_clock.tid].userspace_reading=0;
+        logical_clock_set_perf_counter(group_info, __current_tid());
+    }
+
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 12);
     //are we the lowest?
     if (group_info->lowest_tid==current->task_clock.tid){
@@ -513,6 +522,7 @@ void task_clock_entry_init(struct task_clock_group_info * group_info, struct per
         group_info->clocks[current->task_clock.tid].base_ticks=0;
     }
     group_info->clocks[current->task_clock.tid].initialized=1;
+    group_info->clocks[current->task_clock.tid].userspace_reading=0;
     group_info->clocks[current->task_clock.tid].event=event;
     __clear_entry_state(group_info);
 
@@ -588,7 +598,7 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
   current->task_clock.user_status->notifying_id=0;
   current->task_clock.user_status->notifying_clock=666;
   current->task_clock.user_status->notifying_sample=666;
-
+  group_info->clocks[current->task_clock.tid].userspace_reading=0;
     //if I'm the new lowest, we need to set the flag so userspace can see that that is the case
   int32_t new_low=__new_lowest(group_info, current->task_clock.tid);
   if (new_low >= 0 && new_low == current->task_clock.tid){
@@ -700,13 +710,15 @@ void task_clock_entry_stop_no_notify(struct task_clock_group_info * group_info){
 
 //lets start caring about the ticks we see (again)
 void task_clock_entry_start(struct task_clock_group_info * group_info){
+    current->task_clock.user_status->notifying_id=0;
     //the clock may have continued to run...so reset the ticks we've seen
     logical_clock_reset_current_ticks(group_info,__current_tid());
     task_clock_on_enable(group_info);
-    current->task_clock.user_status->notifying_id=0;
+    ++start_counter;
 }
 
 void task_clock_entry_start_no_notify(struct task_clock_group_info * group_info){
+    group_info->clocks[current->task_clock.tid].userspace_reading=1;
     //the clock may have continued to run...so reset the ticks we've seen
     logical_clock_reset_current_ticks(group_info,__current_tid());
     //now that its reset, lets set the counter to be VERY HIGH...if we get beat by an overflow its ok
@@ -715,7 +727,7 @@ void task_clock_entry_start_no_notify(struct task_clock_group_info * group_info)
     //turn off overflows...just in case
     __tick_counter_turn_off(group_info);
     current->task_clock.user_status->notifying_id=666;
-    //printk(KERN_EMERG "Max? %lld\n", logical_clock_raw_read_pmc(group_info, __current_tid()));
+    ++start_counter;
 }
 
 int init_module(void)
@@ -742,6 +754,7 @@ int init_module(void)
 
   debug_counter=0;
   debug_counter_overflow=0;
+  start_counter=0;
 
   return 0;
 }
@@ -764,5 +777,5 @@ void cleanup_module(void)
   task_clock_func.task_clock_entry_start=NULL;
 
   //__clock_debug_print_overflow(); 
-
+  printk(KERN_EMERG "start counter: %d\n", start_counter);
 }

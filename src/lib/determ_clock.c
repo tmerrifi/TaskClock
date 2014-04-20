@@ -128,6 +128,7 @@ void determ_task_clock_init_with_id(u_int32_t id){
     task_clock_info.disabled=0;
     //set the last clock value to zero
     task_clock_info.last_clock_value=0ULL;
+    task_clock_info.last_raw_perf=0;
     task_clock_info.coarsened_ticks_counter=0ULL;
     task_clock_info.in_coarsened_tx=0;
     tx_estimate_init(&task_clock_info.estimator);
@@ -344,9 +345,23 @@ void __determ_task_clock_start(int start_type){
     else{
         //we are STARTING a coarsened tx (the first one in the block)
         __sys_task_clock_do(TASK_CLOCK_OP_START_COARSENED, 0);
-        uint64_t new_raw = __rdpmc(task_clock_info.user_status->hwc_idx);
     }
 }
+
+uint64_t determ_task_clock_last_raw_perf(){
+    return task_clock_info.last_raw_perf;
+    //return ((__rdpmc(task_clock_info.user_status->hwc_idx) << 16) >> 16);
+}
+
+uint64_t determ_task_clock_period_sets(){
+    return task_clock_info.user_status->period_sets;
+}
+
+uint64_t determ_task_clock_current_raw_perf(){
+    return task_clock_info.current_raw_perf;
+    //return ((__rdpmc(task_clock_info.user_status->hwc_idx) << 16) >> 16);
+}
+
 
 uint64_t determ_task_clock_get_coarsened_ticks(){
     return task_clock_info.coarsened_ticks_counter;
@@ -364,6 +379,10 @@ void determ_task_clock_start(){
     __determ_task_clock_start(TASK_CLOCK_NOT_COARSENED);
 }
 
+int determ_task_clock_in_coarsened_tx(){
+    return task_clock_info.in_coarsened_tx;
+}
+
 //Start the clock, but don't use that as an opportunity to notify waiting threads. This is useful if we're
 //doing a coarsened transaction and don't care about the others. The reason we even do this is that its 
 //faster to avoid that overhead
@@ -373,6 +392,8 @@ void determ_task_clock_start_no_notify(){
         //we've now set the counter to be the max allowable size...we can now read the counter in userspace
         task_clock_info.in_coarsened_tx=1;
     }
+    //we need to read the raw perf counter for calculation later
+    task_clock_info.last_raw_perf = __rdpmc(task_clock_info.user_status->hwc_idx);
 }
 
 u_int64_t determ_task_clock_get_last_tx_size(){
@@ -386,21 +407,26 @@ void __determ_task_clock_stop_with_id(uint32_t id, int stop_type){
         exit(EXIT_FAILURE);
         }*/
 
+    uint64_t tx_size=0;
+
     if (stop_type==TASK_CLOCK_NOT_COARSENED){
         __sys_task_clock_do(TASK_CLOCK_OP_STOP, 0);
+        tx_size = determ_task_clock_get_last_tx_size();
     }
     else{
         uint64_t new_raw = __rdpmc(task_clock_info.user_status->hwc_idx);
-        uint64_t max_raw = (uint64_t)(-((int64_t)MAX_CLOCK_VAL));
+        //uint64_t max_raw = (uint64_t)(-((int64_t)MAX_CLOCK_VAL));
         uint64_t shift = 16ULL;
-        uint64_t delta = (new_raw << shift) - (max_raw << shift);
+        uint64_t delta = (new_raw << shift) - (task_clock_info.last_raw_perf << shift);
         //shift it back to get the actually correct number
         delta >>= shift;
         //add the delta to the ticks
         task_clock_info.coarsened_ticks_counter+=delta;
+        tx_size = delta;
+        task_clock_info.current_raw_perf=new_raw;
     }
 
-    tx_estimate_add_observation(&task_clock_info.estimator, id, determ_task_clock_get_last_tx_size());
+    tx_estimate_add_observation(&task_clock_info.estimator, id, tx_size);
 #if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
     uint64_t diff=0;
 #ifdef DEBUG_CLOCK_CACHE_PROFILE

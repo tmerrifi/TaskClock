@@ -14,4 +14,6 @@
 
 #define logical_clock_set_perf_counter_max(group_info, id)
 
+#define logical_clock_set_perf_counter(group_info, id)
+
 #endif
