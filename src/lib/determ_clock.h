@@ -38,6 +38,11 @@
        uint64_t period_sets;
    } __attribute__ ((aligned (8), packed));
 
+     struct debug_obs_length{
+         u_int32_t id;
+         u_int64_t length;
+     };
+
    struct determ_task_clock_info{
        u_int32_t tid;
        struct perf_counter_info perf_counter;
@@ -50,6 +55,8 @@
        u_int8_t in_coarsened_tx;
        u_int64_t last_raw_perf;
        u_int64_t current_raw_perf;
+       u_int64_t debug_tx_count;
+       struct debug_obs_length debug_tx_length[1000];
    };
 
    struct determ_clock_info{
@@ -124,6 +131,8 @@
      uint64_t determ_task_clock_current_raw_perf();
      uint64_t determ_task_clock_period_sets();
      int determ_task_clock_in_coarsened_tx();
+     void determ_task_clock_tx_debug(uint32_t id, int * observations);
+     struct debug_obs_length * determ_task_clock_get_tx_debug(int * tx_count);
 
 #endif
 

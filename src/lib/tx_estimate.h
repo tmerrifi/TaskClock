@@ -43,17 +43,27 @@ static inline void tx_estimate_add_observation(struct tx_estimator * txe, uint32
 static inline int64_t tx_estimate_next_observation_guess(struct tx_estimator * txe, uint32_t identifier){
     uint64_t total, result;
     struct tx_estimate * tx = __tx_get_entry(txe, identifier);
+    char output[200];
     if (tx->counter > TX_ESTIMATE_MIN_OBSERVATIONS){
         total=0;
         for (int i=0;i<TX_ESTIMATE_TOTAL_OBSERVVATIONS;++i){
             total+=abs(tx->observations[i]-tx->ewma);
+            //sprintf(output, "%d ", tx->observations[i]);
         }
         result=(tx->ewma+(total/TX_ESTIMATE_TOTAL_OBSERVVATIONS));
+        //printf("tx: %u %s\n", identifier, output);
     }
     else{
         result=-1;
     }
     return result;
+}
+
+static inline void tx_estimate_debug(struct tx_estimator * txe, uint32_t identifier, int * observations){
+    struct tx_estimate * tx = __tx_get_entry(txe, identifier);
+    for (int i=0;i<TX_ESTIMATE_TOTAL_OBSERVVATIONS;++i){
+        observations[i]=tx->observations[i];
+    }
 }
 
 #endif
