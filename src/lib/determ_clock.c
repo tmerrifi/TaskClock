@@ -129,7 +129,6 @@ void determ_task_clock_init_with_id(u_int32_t id){
     //set the last clock value to zero
     task_clock_info.last_clock_value=0ULL;
     task_clock_info.last_raw_perf=0;
-    task_clock_info.debug_tx_count=0;
     task_clock_info.coarsened_ticks_counter=0ULL;
     task_clock_info.in_coarsened_tx=0;
     tx_estimate_init(&task_clock_info.estimator);
@@ -403,11 +402,6 @@ u_int64_t determ_task_clock_get_last_tx_size(){
     return determ_task_clock_read() - task_clock_info.last_clock_value;
 }
 
-struct debug_obs_length * determ_task_clock_get_tx_debug(int * tx_count){
-    *tx_count=task_clock_info.debug_tx_count;
-    return task_clock_info.debug_tx_length;
-}
-
 void __determ_task_clock_stop_with_id(uint32_t id, int stop_type){
     //read the clock
     /*if ( ioctl(task_clock_info.perf_counter.fd, stop_type) != 0){
@@ -433,13 +427,7 @@ void __determ_task_clock_stop_with_id(uint32_t id, int stop_type){
         tx_size = delta;
         task_clock_info.current_raw_perf=new_raw;
     }
-    
-    if (task_clock_info.debug_tx_count++ < 1000){
-        task_clock_info.debug_tx_length[task_clock_info.debug_tx_count].length=tx_size;
-        task_clock_info.debug_tx_length[task_clock_info.debug_tx_count].id=id;
-    }
 
-    //debug_tx_length
     tx_estimate_add_observation(&task_clock_info.estimator, id, tx_size);
 #if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
     uint64_t diff=0;
@@ -495,9 +483,4 @@ void determ_debugging_print_event(){}
 
 void determ_task_clock_close(){
     perf_counter_close(&task_clock_info.perf_counter);
-}
-
-
-void determ_task_clock_tx_debug(uint32_t id, int * observations){
-    tx_estimate_debug(&task_clock_info.estimator, id, observations);
 }
