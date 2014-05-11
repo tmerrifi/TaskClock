@@ -402,11 +402,23 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
     unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);
+    
+    //if the counter is running, grab the ticks that may not have been counted by the NMI handler
+    if (__tick_counter_is_running(group_info)){
+        if (__current_tid()==1)
+            printk(KERN_EMERG " updating from disable....");
+        logical_clock_update_clock_ticks(group_info, current->task_clock.tid);
+        //turn the counter off...
+        __tick_counter_turn_off(group_info);
+    }
+    else{
+        if (__current_tid()==1)
+            printk(KERN_EMERG " resetting from disable....");
+        //clear the counter
+        logical_clock_reset_current_ticks(group_info,__current_tid());
+    }
 
-    //turn the counter off...not that it matters since the "real" perf-counter is off
-    __tick_counter_turn_off(group_info);
-    //update our clock in case some of the instructions weren't counted in the overflow handler
-    logical_clock_update_clock_ticks(group_info, current->task_clock.tid);
+
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 10);
     //am I the lowest?
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
