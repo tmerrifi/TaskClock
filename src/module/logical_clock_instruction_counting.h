@@ -17,12 +17,12 @@ static inline void logical_clock_update_clock_ticks(struct task_clock_group_info
     unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); 
     group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         
 
-    if (tid==0 && tid==1){
+    /*    if (tid==0 && tid==1){
 
         printk(KERN_EMERG " HUH 2 ????? %lld id %d current clock %llu userspace addr %p userspace %llu\n", 
                rawcount, tid , __get_clock_ticks(group_info, tid), &current->task_clock.user_status->ticks, current->task_clock.user_status->ticks);
 
-    }
+               }*/
 
     __inc_clock_ticks(group_info, tid, rawcount); 
     local64_set(&group_info->clocks[tid].event->count, 0);
@@ -70,12 +70,16 @@ static inline void logical_clock_read_clock_and_update(struct task_clock_group_i
     delta = (new_raw_count << shift) - (prev_raw_count << shift);
     //shift it back to get the actually correct number
     delta >>= shift;
-    if (id==0 && id==1){
-        printk(KERN_EMERG " HUH????? %lld id %d current clock %llu userspace addr %p userspace %llu\n", 
-               delta, id , __get_clock_ticks(group_info, id), &current->task_clock.user_status->ticks, current->task_clock.user_status->ticks);
-    }
-    //printk(KERN_EMERG " raw counter: %llu %llu %llu %llu idx %d tid %d new prev %llu\n", 
-    //       ((new_raw_count << shift)>>shift), ((new_pmc << shift)>>shift), ((prev_raw_count << shift)>>shift), delta, hwc->idx, __current_tid(), local64_read(&hwc->prev_count));
+    //now add the event count in...why you may ask...Because the event's count field may have ticks we missed...I believe this is primarily
+    //due to context switches.
+    delta+=local64_read(&group_info->clocks[id].event->count);
+    /*int cpu=smp_processor_id();
+    u64 total=arch_irq_stat_cpu(cpu);
+    if (id==1){
+        printk(KERN_EMERG "update 2...delta: %lld id: %d current clock: %llu irqs: %d count: %llu cpu %d \n", 
+               delta, id , __get_clock_ticks(group_info, id), total, local64_read(&group_info->clocks[id].event->count), cpu);
+               }*/
+    local64_set(&group_info->clocks[id].event->count, 0);
     //add it to our current clock
     __inc_clock_ticks(group_info, id, delta);
     //let userspace see it
