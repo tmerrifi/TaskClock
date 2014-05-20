@@ -10,6 +10,28 @@ static inline int __is_lowest(struct task_clock_group_info * group_info, int32_t
   return 0;
 } 
 
+static inline int32_t __active_thread_count(struct task_clock_group_info * group_info){
+    int32_t count=0;
+    int i=0;
+
+    if (in_nmi()){
+        listarray_foreach_allelements(group_info->active_threads, i){
+            struct task_clock_entry_info * entry = &group_info->clocks[i];
+            if (entry->initialized && !entry->inactive && !entry->sleeping){
+                count++;
+            }
+        }
+    }
+    else{
+        listarray_foreach(group_info->active_threads, i){
+            struct task_clock_entry_info * entry = &group_info->clocks[i];
+            if (entry->initialized && !entry->inactive && !entry->sleeping){
+                count++;
+            }
+        }
+    }
+    return count;
+}
 
 static inline int32_t  __search_for_lowest_waiting_exclude_current(struct task_clock_group_info * group_info, int32_t tid){
     int i=0;
@@ -73,8 +95,9 @@ static inline int32_t __search_for_lowest_print(struct task_clock_group_info * g
       listarray_foreach(group_info->active_threads, i){
           printk(KERN_EMERG "  looking at %d, min %d ", i, min_tid);
           if (min_tid>=0){
-              printk(KERN_EMERG "    clock: %llu, min: %llu, result: %d", 
-                     __get_clock_ticks(group_info, i), __get_clock_ticks(group_info, min_tid), __clock_is_lower(group_info, i, min_tid));
+              printk(KERN_EMERG "    clock: %llu, min: %llu, result: %d, waiting: %d sleeping %d", 
+                     __get_clock_ticks(group_info, i), __get_clock_ticks(group_info, min_tid), 
+                     __clock_is_lower(group_info, i, min_tid), group_info->clocks[i].waiting, group_info->clocks[i].sleeping );
           }
           struct task_clock_entry_info * entry = &group_info->clocks[i];
           if (entry->initialized && !entry->inactive && (min_tid < 0 || __clock_is_lower(group_info, i, min_tid))){
