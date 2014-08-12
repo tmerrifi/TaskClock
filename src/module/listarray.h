@@ -35,7 +35,7 @@ struct listarray{
     for (int_i=la->head;int_i!=LISTARRAY_ENTRY_NULL;int_i=listarray_getentry(la, int_i).next) \
     
 #define listarray_foreach_allelements(la, int_i) \
-    for (int_i=0;int_i<la->max_index;int_i++) \
+    for (int_i=0;int_i<=la->max_index;int_i++) \
 
 #define __print_debugging(la, int_i)                                   \
     printk(KERN_EMERG "index: %d, next %d, prev %d, head %d, tail %d, count %d\n", \
