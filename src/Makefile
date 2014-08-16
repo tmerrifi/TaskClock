@@ -11,7 +11,7 @@ all : dynlib module
 dynlib: $(SOURCES) 
 	gcc -shared $(CFLAGS) -o libDetermTaskClock.so $(SOURCES) $(LIBS); \
 	sudo cp libDetermTaskClock.so /usr/lib; \
-
+	echo "10000000" | sudo tee /proc/sys/kernel/perf_event_max_sample_rate;
 
 %.o : %.c
 	sudo cp lib/*.h /usr/include; \
