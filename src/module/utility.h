@@ -22,7 +22,7 @@
 
 
 #define __inc_clock_ticks(group_info, tid, val) \
-    (group_info->clocks[tid].ticks+=((val * ((((uint64_t)current->task_clock.user_status->scaling_whole)*10ULL)+((uint64_t)current->task_clock.user_status->scaling_fraction)))/10ULL))
+    group_info->clocks[tid].ticks+=val;
 
 #define __set_clock_ticks(group_info, tid, val) (group_info->clocks[tid].ticks=val)
 
