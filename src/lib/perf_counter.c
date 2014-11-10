@@ -35,12 +35,13 @@ void perf_counter_init(u_int32_t sample_period, int32_t group_fd, struct perf_co
 
   //clear the perf_event_attr struct                                                                                   
   memset(&pe, 0, sizeof(struct perf_event_attr));
-  pe.type = PERF_TYPE_HARDWARE;
-  //pe.type = PERF_TYPE_RAW;
+  pe.type = PERF_TYPE_RAW;
   pe.size = sizeof(struct perf_event_attr);
-  pe.config = PERF_COUNT_HW_INSTRUCTIONS;
-  //pe.config = PERF_COUNT_CPU_CYCLES;
-  //pe.config = (0x0BULL) | (0x0200ULL);
+  //INSTRUCTIONS RETIRED
+  //pe.config = (0x0C0ULL) | (0x0000ULL);
+  //Retired conditional branches
+  pe.config = (0x00C4ULL) | (0x0100ULL);
+
   pe.disabled = 1;
   pe.exclude_kernel = 1;
   pe.exclude_hv = 1;
