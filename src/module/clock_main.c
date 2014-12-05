@@ -19,6 +19,7 @@
 #include <linux/hardirq.h>
 
 #include "listarray.h"
+#include "bounded_tso.h"
 #include "utility.h"
 #include "search_entries.h"
 
@@ -280,7 +281,7 @@ void task_clock_entry_overflow_update_period(struct task_clock_group_info * grou
 }
 
 
-void task_clock_overflow_handler(struct task_clock_group_info * group_info){
+void task_clock_overflow_handler(struct task_clock_group_info * group_info, struct pt_regs *regs){
   unsigned long flags;
   int32_t new_low=-1;
 
@@ -288,8 +289,10 @@ void task_clock_overflow_handler(struct task_clock_group_info * group_info){
   if (!__tick_counter_is_running(group_info)){
       return;
   }
-
   
+  if (__single_stepping_on(group_info, __current_tid())){
+      bounded_memory_fence_turn_on_tf(group_info, regs);
+  }
 
   //spin_lock_irqsave(&group_info->nmi_lock, flags);
   new_low=__new_lowest(group_info, current->task_clock.tid);
@@ -425,7 +428,6 @@ void task_clock_add_ticks(struct task_clock_group_info * group_info, int32_t tic
     //TODO: Why are we disabling interrupts here?
     unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);
-
     __inc_clock_ticks(group_info, current->task_clock.tid, ticks);
     current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 11);
@@ -440,6 +442,9 @@ void task_clock_on_enable(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
     unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);
+
+    //reset the tick value now so we can figure out the length of a chunk later
+    __reset_chunk_ticks(group_info, __current_tid());
 
     //turn the counter back on...next overflow will actually be counted
     __tick_counter_turn_on(group_info);
@@ -524,6 +529,7 @@ void task_clock_entry_init(struct task_clock_group_info * group_info, struct per
     group_info->clocks[current->task_clock.tid].initialized=1;
     group_info->clocks[current->task_clock.tid].userspace_reading=0;
     group_info->clocks[current->task_clock.tid].event=event;
+    __reset_chunk_ticks(group_info, __current_tid());
     __clear_entry_state(group_info);
 
     if (current->task_clock.tid==0 && group_info->user_status_arr==NULL){
@@ -598,6 +604,9 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
   current->task_clock.user_status->notifying_id=0;
   current->task_clock.user_status->notifying_clock=666;
   current->task_clock.user_status->notifying_sample=666;
+  current->task_clock.user_status->hit_bounded_fence=0;
+
+  __reset_chunk_ticks(group_info, __current_tid());
   group_info->clocks[current->task_clock.tid].userspace_reading=0;
     //if I'm the new lowest, we need to set the flag so userspace can see that that is the case
   int32_t new_low=__new_lowest(group_info, current->task_clock.tid);
@@ -630,6 +639,7 @@ void task_clock_entry_activate_other(struct task_clock_group_info * group_info, 
     //group_info->clocks[id].base_ticks=__get_clock_ticks(group_info, current->task_clock.tid) + 1;
     __clear_entry_state_by_id(group_info, id);
     __mark_as_active(group_info, id);
+    __reset_chunk_ticks(group_info, id);
     //if the newly activated thread is the lowest, then we need to set a flag so userspace can deal with it. Since
     //another thread may be convinced it is the lowest
     if (group_info->lowest_tid < 0 || __clock_is_lower(group_info, id, group_info->lowest_tid)){
@@ -748,6 +758,10 @@ void task_clock_entry_start_no_notify(struct task_clock_group_info * group_info)
     ++start_counter;
 }
 
+int task_clock_entry_is_singlestep(struct task_clock_group_info * group_info, struct pt_regs *regs){
+    return on_single_step(group_info, regs);
+}
+
 int init_module(void)
 {
   task_clock_func.task_clock_overflow_handler=task_clock_overflow_handler;
@@ -769,6 +783,7 @@ int init_module(void)
   task_clock_func.task_clock_entry_reset=task_clock_entry_reset;
   task_clock_func.task_clock_entry_start_no_notify=task_clock_entry_start_no_notify;
   task_clock_func.task_clock_entry_stop_no_notify=task_clock_entry_stop_no_notify;
+  task_clock_func.task_clock_entry_is_singlestep=task_clock_entry_is_singlestep;
 
   debug_counter_overflow=0;
   __debug_counter_overflow=0;
@@ -793,6 +808,8 @@ void cleanup_module(void)
   task_clock_func.task_clock_debug_add_event=NULL;  
   task_clock_func.task_clock_entry_stop=NULL;
   task_clock_func.task_clock_entry_start=NULL;
+  task_clock_func.task_clock_entry_is_singlestep=NULL;
+
 
   printk(KERN_EMERG "start counter: %d\n", start_counter);
 }

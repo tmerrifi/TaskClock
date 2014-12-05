@@ -18,16 +18,18 @@
     group_info->clocks[__current_tid()].count_ticks=1;
 
 #define __tick_counter_is_running(group_info) \
-    group_info->clocks[__current_tid()].count_ticks
-
+    (group_info->clocks[__current_tid()].count_ticks)
 
 #define __inc_clock_ticks(group_info, tid, val) \
-    group_info->clocks[tid].ticks+=val;
+    group_info->clocks[tid].ticks+=val; \
+    __inc_chunk_ticks(group_info, tid, val);
+    
+#define __inc_clock_ticks_from_single_step(group_info, tid, val) \
+    group_info->clocks[tid].ticks+=val;      
 
 #define __set_clock_ticks(group_info, tid, val) (group_info->clocks[tid].ticks=val)
 
 #define __get_clock_ticks(group_info, tid) (group_info->clocks[tid].ticks + group_info->clocks[tid].base_ticks)
-
 
 #define __clock_is_lower(group_info, tid1, tid2) ( ((__get_clock_ticks(group_info, tid1))  < (__get_clock_ticks(group_info, tid2))) \
                                                || ((__get_clock_ticks(group_info, tid1)) == (__get_clock_ticks(group_info, tid2))  && (tid1 < tid2)))
@@ -35,13 +37,16 @@
 #define __clear_entry_state(group_info) \
     group_info->clocks[__current_tid()].inactive=0;\
     group_info->clocks[__current_tid()].waiting=0;\
-    group_info->clocks[__current_tid()].sleeping=0;
-    
+    group_info->clocks[__current_tid()].sleeping=0;\
+    __hit_bounded_fence_disable();
+
 
 #define __clear_entry_state_by_id(group_info, id) \
     group_info->clocks[id].inactive=0;\
     group_info->clocks[id].waiting=0;\
-    group_info->clocks[id].sleeping=0;
+    group_info->clocks[id].sleeping=0;\
+    current->task_clock.user_status->hit_bounded_fence=0;
+
 
 #define __mark_as_inactive(group_info, id)         \
     group_info->clocks[id].inactive=1; \

@@ -2,6 +2,8 @@
 #ifndef LOGICAL_CLOCK_H
 #define LOGICAL_CLOCK_H
 
+#include "bounded_tso.h"
+
 //whats the max overflow period
 #define MAX_CLOCK_SAMPLE_PERIOD 200000
 
@@ -61,6 +63,9 @@ static inline void logical_clock_read_clock_and_update(struct task_clock_group_i
     //ARCH_DEP_TODO
     int shift = 64 - X86_CNT_VAL_BITS;
     struct hw_perf_event * hwc = &group_info->clocks[id].event->hw;
+
+    //lets check to make sure the counter is currently on, otherwise we'll still read the counter but throw away the ticks we accrued
+    int counter_was_on = __tick_counter_is_running(group_info);
     //read the counters using rdmsr
     __read_performance_counter(hwc, &new_raw_count, &prev_raw_count, &new_pmc);
     //if this succeeds, then its safe to turn off the tick_counter...meaning we no longer do work inside the overflow handler.
@@ -80,10 +85,12 @@ static inline void logical_clock_read_clock_and_update(struct task_clock_group_i
                delta, id , __get_clock_ticks(group_info, id), total, local64_read(&group_info->clocks[id].event->count), cpu);
                }*/
     local64_set(&group_info->clocks[id].event->count, 0);
-    //add it to our current clock
-    __inc_clock_ticks(group_info, id, delta);
-    //let userspace see it
-    current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
+    if (counter_was_on){
+        //add it to our current clock
+        __inc_clock_ticks(group_info, id, delta);
+        //let userspace see it
+        current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
+    }
 }
 
 static inline void logical_clock_reset_current_ticks(struct task_clock_group_info * group_info, int id){
@@ -141,7 +148,7 @@ static inline void logical_clock_update_overflow_period(struct task_clock_group_
             }
         }
         group_info->clocks[id].debug_last_sample_period = group_info->clocks[id].event->hw.sample_period;
-        group_info->clocks[id].event->hw.sample_period =  __min(new_sample_period, MAX_CLOCK_SAMPLE_PERIOD);
+        group_info->clocks[id].event->hw.sample_period =  __min(__bound_overflow_period(group_info, id, new_sample_period), MAX_CLOCK_SAMPLE_PERIOD);
     }
 #endif
 }

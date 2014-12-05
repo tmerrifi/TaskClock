@@ -484,3 +484,7 @@ void determ_debugging_print_event(){}
 void determ_task_clock_close(){
     perf_counter_close(&task_clock_info.perf_counter);
 }
+
+int determ_task_clock_hit_bounded_fence(){
+    return task_clock_info.user_status->hit_bounded_fence;
+}
