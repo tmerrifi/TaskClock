@@ -2,9 +2,15 @@
 
 #define BOUNDED_TSO_H
 
-#define IMPRECISE_OVERFLOW_BUFFER (20)
+//this is our estimate of how "fuzzy" the performance counter overflows are. By setting
+//the counter to n-IMPRECISE_OVERFLOW_BUFFER, we are certain that the overflow will
+//arrive where count<n. In reality, the accuracy of IMPRECISE_OVERFLOW_BUFFER will (anecdotally)
+//be determined by the size of the reorder buffer.
+#define IMPRECISE_OVERFLOW_BUFFER (200)
 
-#define BOUNDED_CHUNK_SIZE (10000000)
+//This determines the maximum store buffer size. When we hit BOUNDED_CHUNK_SIZE instructions,
+//we force a commit.
+#define BOUNDED_CHUNK_SIZE (2000000)
 
 #define IMPRECISE_BOUNDED_CHUNK_SIZE (BOUNDED_CHUNK_SIZE - IMPRECISE_OVERFLOW_BUFFER)
 
@@ -32,7 +38,7 @@ void bounded_memory_fence_turn_on_tf(struct task_clock_group_info * group_info, 
 #define __reset_chunk_ticks(group_info, tid) (group_info->clocks[tid].chunk_ticks=0)
 
 #ifdef USE_BOUNDED_FENCE
-
+//using the bounded fence
 #define __inc_chunk_ticks(group_info, tid, val) \
     group_info->clocks[tid].chunk_ticks+=val; \
     if (__get_chunk_ticks(group_info, tid) > IMPRECISE_BOUNDED_CHUNK_SIZE){ \

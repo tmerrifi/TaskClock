@@ -428,7 +428,7 @@ void task_clock_add_ticks(struct task_clock_group_info * group_info, int32_t tic
     //TODO: Why are we disabling interrupts here?
     unsigned long flags;
     spin_lock_irqsave(&group_info->lock, flags);
-    __inc_clock_ticks(group_info, current->task_clock.tid, ticks);
+    __inc_clock_ticks_no_chunk_add(group_info, current->task_clock.tid, ticks);
     current->task_clock.user_status->ticks=__get_clock_ticks(group_info, current->task_clock.tid);
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 11);
     spin_unlock_irqrestore(&group_info->lock, flags);
@@ -764,26 +764,28 @@ int task_clock_entry_is_singlestep(struct task_clock_group_info * group_info, st
 
 int init_module(void)
 {
-  task_clock_func.task_clock_overflow_handler=task_clock_overflow_handler;
-  task_clock_func.task_clock_group_init=task_clock_group_init;
-  task_clock_func.task_clock_entry_init=task_clock_entry_init;
-  task_clock_func.task_clock_entry_activate=task_clock_entry_activate;
-  task_clock_func.task_clock_entry_halt=task_clock_entry_halt;
-  task_clock_func.task_clock_on_disable=task_clock_on_disable;
-  task_clock_func.task_clock_on_enable=task_clock_on_enable;
-  task_clock_func.task_clock_entry_activate_other=task_clock_entry_activate_other;
-  task_clock_func.task_clock_entry_wait=task_clock_entry_wait;
-  task_clock_func.task_clock_entry_sleep=task_clock_entry_sleep;
-  task_clock_func.task_clock_overflow_update_period=task_clock_entry_overflow_update_period;
-  task_clock_func.task_clock_add_ticks=task_clock_add_ticks;
-  task_clock_func.task_clock_entry_woke_up=task_clock_entry_woke_up;
-  task_clock_func.task_clock_debug_add_event=task_clock_debug_add_event;
-  task_clock_func.task_clock_entry_stop=task_clock_entry_stop;
-  task_clock_func.task_clock_entry_start=task_clock_entry_start;
-  task_clock_func.task_clock_entry_reset=task_clock_entry_reset;
-  task_clock_func.task_clock_entry_start_no_notify=task_clock_entry_start_no_notify;
-  task_clock_func.task_clock_entry_stop_no_notify=task_clock_entry_stop_no_notify;
-  task_clock_func.task_clock_entry_is_singlestep=task_clock_entry_is_singlestep;
+    BUG_ON(BOUNDED_CHUNK_SIZE<MAX_CLOCK_SAMPLE_PERIOD);
+    
+    task_clock_func.task_clock_overflow_handler=task_clock_overflow_handler;
+    task_clock_func.task_clock_group_init=task_clock_group_init;
+    task_clock_func.task_clock_entry_init=task_clock_entry_init;
+    task_clock_func.task_clock_entry_activate=task_clock_entry_activate;
+    task_clock_func.task_clock_entry_halt=task_clock_entry_halt;
+    task_clock_func.task_clock_on_disable=task_clock_on_disable;
+    task_clock_func.task_clock_on_enable=task_clock_on_enable;
+    task_clock_func.task_clock_entry_activate_other=task_clock_entry_activate_other;
+    task_clock_func.task_clock_entry_wait=task_clock_entry_wait;
+    task_clock_func.task_clock_entry_sleep=task_clock_entry_sleep;
+    task_clock_func.task_clock_overflow_update_period=task_clock_entry_overflow_update_period;
+    task_clock_func.task_clock_add_ticks=task_clock_add_ticks;
+    task_clock_func.task_clock_entry_woke_up=task_clock_entry_woke_up;
+    task_clock_func.task_clock_debug_add_event=task_clock_debug_add_event;
+    task_clock_func.task_clock_entry_stop=task_clock_entry_stop;
+    task_clock_func.task_clock_entry_start=task_clock_entry_start;
+    task_clock_func.task_clock_entry_reset=task_clock_entry_reset;
+    task_clock_func.task_clock_entry_start_no_notify=task_clock_entry_start_no_notify;
+    task_clock_func.task_clock_entry_stop_no_notify=task_clock_entry_stop_no_notify;
+    task_clock_func.task_clock_entry_is_singlestep=task_clock_entry_is_singlestep;
 
   debug_counter_overflow=0;
   __debug_counter_overflow=0;

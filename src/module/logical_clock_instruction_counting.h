@@ -17,16 +17,8 @@
 
 static inline void logical_clock_update_clock_ticks(struct task_clock_group_info * group_info, int tid){
     unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); 
-    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;         
-
-    /*    if (tid==0 && tid==1){
-
-        printk(KERN_EMERG " HUH 2 ????? %lld id %d current clock %llu userspace addr %p userspace %llu\n", 
-               rawcount, tid , __get_clock_ticks(group_info, tid), &current->task_clock.user_status->ticks, current->task_clock.user_status->ticks);
-
-               }*/
-
-    __inc_clock_ticks(group_info, tid, rawcount); 
+    group_info->clocks[tid].debug_last_overflow_ticks=rawcount;
+    __inc_clock_ticks(group_info, tid, rawcount);
     local64_set(&group_info->clocks[tid].event->count, 0);
 }
 
@@ -113,7 +105,6 @@ static inline void logical_clock_set_perf_counter_max(struct task_clock_group_in
     local64_set(&hwc->prev_count, (u64)-val);
 
     //what did we set the counter to?
-    //printk(KERN_EMERG " new counter: %llu\n", (uint64_t)(-val) & X86_CNT_VAL_MASK);
     group_info->clocks[id].event->last_written = (uint64_t)(-val);
 }
 
@@ -136,20 +127,18 @@ static inline void logical_clock_update_overflow_period(struct task_clock_group_
     uint64_t lowest_waiting_tid_clock, myclock, new_sample_period;
     int32_t lowest_waiting_tid=0;    
 
-    if (group_info->clocks[id].event){
-        new_sample_period=group_info->clocks[id].event->hw.sample_period+10000;
-        lowest_waiting_tid = __search_for_lowest_waiting_exclude_current(group_info, id);
-        if (lowest_waiting_tid>=0){
-            lowest_waiting_tid_clock = __get_clock_ticks(group_info,lowest_waiting_tid);
-            myclock = __get_clock_ticks(group_info,id);
-            //if there is a waiting thread, and its clock is larger than ours, stop when we get there
-            if (lowest_waiting_tid_clock > myclock){
-                new_sample_period=__max(lowest_waiting_tid_clock - myclock + 1000, MIN_CLOCK_SAMPLE_PERIOD);
-            }
+    new_sample_period=group_info->clocks[id].event->hw.sample_period+10000;
+    lowest_waiting_tid = __search_for_lowest_waiting_exclude_current(group_info, id);
+    if (lowest_waiting_tid>=0){
+        lowest_waiting_tid_clock = __get_clock_ticks(group_info,lowest_waiting_tid);
+        myclock = __get_clock_ticks(group_info,id);
+        //if there is a waiting thread, and its clock is larger than ours, stop when we get there
+        if (lowest_waiting_tid_clock > myclock){
+            new_sample_period=__max(lowest_waiting_tid_clock - myclock + 1000, MIN_CLOCK_SAMPLE_PERIOD);
         }
-        group_info->clocks[id].debug_last_sample_period = group_info->clocks[id].event->hw.sample_period;
-        group_info->clocks[id].event->hw.sample_period =  __min(__bound_overflow_period(group_info, id, new_sample_period), MAX_CLOCK_SAMPLE_PERIOD);
     }
+    group_info->clocks[id].debug_last_sample_period = group_info->clocks[id].event->hw.sample_period;
+    group_info->clocks[id].event->hw.sample_period =  __min(__bound_overflow_period(group_info, id, new_sample_period), MAX_CLOCK_SAMPLE_PERIOD);
 #endif
 }
 

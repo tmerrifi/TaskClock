@@ -24,7 +24,7 @@
     group_info->clocks[tid].ticks+=val; \
     __inc_chunk_ticks(group_info, tid, val);
     
-#define __inc_clock_ticks_from_single_step(group_info, tid, val) \
+#define __inc_clock_ticks_no_chunk_add(group_info, tid, val) \
     group_info->clocks[tid].ticks+=val;      
 
 #define __set_clock_ticks(group_info, tid, val) (group_info->clocks[tid].ticks=val)
