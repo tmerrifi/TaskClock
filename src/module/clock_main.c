@@ -386,8 +386,12 @@ int __determine_lowest_and_notify_or_wait(struct task_clock_group_info * group_i
 void task_clock_on_disable(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
     unsigned long flags;
-    spin_lock_irqsave(&group_info->lock, flags);
-    
+
+    //if we are in single stepping mode, we no longer need it
+    if (__single_stepping_on(group_info, __current_tid())){
+        end_bounded_memory_fence_early(group_info);
+    }
+
     //if the counter is running, grab the ticks that may not have been counted by the NMI handler
     if (__tick_counter_is_running(group_info)){
         logical_clock_update_clock_ticks(group_info, current->task_clock.tid);
@@ -398,13 +402,8 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
         //clear the counter
         logical_clock_reset_current_ticks(group_info,__current_tid());
     }
-
-    //are we the lowest tid?
-    if (group_info->lowest_tid==__current_tid()){
-        //if we are the lowest...a notification is surely needed
-    }
-    
     group_info->notification_needed=1;
+    spin_lock_irqsave(&group_info->lock, flags);
     lowest_tid=__determine_lowest_and_notify_or_wait(group_info, 10);
     //am I the lowest?
 #if defined(DEBUG_TASK_CLOCK_COARSE_GRAINED)
@@ -414,12 +413,6 @@ void task_clock_on_disable(struct task_clock_group_info * group_info){
     spin_unlock_irqrestore(&group_info->lock, flags);
     if (lowest_tid>=0){
         __wake_up_waiting_thread(group_info, lowest_tid);
-    }
-    //debugging
-    else{
-        if (__active_thread_count(group_info)==0){
-            printk(KERN_EMERG "UHOH!!!!!!!!!!!!!\n");
-        }
     }
 }
 
@@ -529,8 +522,11 @@ void task_clock_entry_init(struct task_clock_group_info * group_info, struct per
     group_info->clocks[current->task_clock.tid].initialized=1;
     group_info->clocks[current->task_clock.tid].userspace_reading=0;
     group_info->clocks[current->task_clock.tid].event=event;
+    group_info->clocks[current->task_clock.tid].count_ticks=0;
+    
     __reset_chunk_ticks(group_info, __current_tid());
     __clear_entry_state(group_info);
+    __tick_counter_turn_off(group_info);
 
     if (current->task_clock.tid==0 && group_info->user_status_arr==NULL){
         unsigned long user_page_addr = PAGE_ALIGN((unsigned long)(current->task_clock.user_status)) - PAGE_SIZE;
@@ -595,8 +591,9 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
 #endif
   unsigned long flags;
   spin_lock_irqsave(&group_info->lock, flags);
-  //__set_base_ticks(group_info, current->task_clock.tid,group_info->lowest_ticks);
   __clear_entry_state(group_info);
+  //need to reset chunk ticks before calling logical_clock_update_overflow_period
+  __reset_chunk_ticks(group_info, __current_tid());
   __mark_as_active(group_info, __current_tid());
   logical_clock_reset_overflow_period(group_info, __current_tid());
   //__update_period(group_info);
@@ -606,7 +603,6 @@ void task_clock_entry_activate(struct task_clock_group_info * group_info){
   current->task_clock.user_status->notifying_sample=666;
   current->task_clock.user_status->hit_bounded_fence=0;
 
-  __reset_chunk_ticks(group_info, __current_tid());
   group_info->clocks[current->task_clock.tid].userspace_reading=0;
     //if I'm the new lowest, we need to set the flag so userspace can see that that is the case
   int32_t new_low=__new_lowest(group_info, current->task_clock.tid);
@@ -717,6 +713,11 @@ void task_clock_entry_stop(struct task_clock_group_info * group_info){
     int lowest_tid=-1;
     int profile=0;
 
+    //if we are in single stepping mode, we no longer need it
+    if (__single_stepping_on(group_info, __current_tid())){
+        end_bounded_memory_fence_early(group_info);
+    }
+    
     //read the counter and update our clock
     logical_clock_read_clock_and_update(group_info, __current_tid());
     
@@ -785,8 +786,12 @@ int init_module(void)
     task_clock_func.task_clock_entry_reset=task_clock_entry_reset;
     task_clock_func.task_clock_entry_start_no_notify=task_clock_entry_start_no_notify;
     task_clock_func.task_clock_entry_stop_no_notify=task_clock_entry_stop_no_notify;
+#ifdef USE_BOUNDED_FENCE
     task_clock_func.task_clock_entry_is_singlestep=task_clock_entry_is_singlestep;
-
+#else
+    task_clock_func.task_clock_entry_is_singlestep=NULL;
+#endif
+    
   debug_counter_overflow=0;
   __debug_counter_overflow=0;
   start_counter=0;

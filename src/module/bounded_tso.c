@@ -5,6 +5,7 @@
 #include <linux/ptrace.h>
 #include <asm/page_types.h>
 #include <linux/hardirq.h>
+#include <linux/perf_event.h>
 
 #include "utility.h"
 #include "bounded_tso.h"
@@ -15,25 +16,43 @@ void begin_bounded_memory_fence( struct task_clock_group_info * group_info){
     uint64_t remaining_ticks;
     struct pt_regs *regs;
 
-    remaining_ticks=BOUNDED_CHUNK_SIZE - __get_chunk_ticks(group_info, __current_tid());
-    //if the chunk has exceeded (or is equal to) the bounded chunk size...whoops!
-    BUG_ON(__get_chunk_ticks(group_info, __current_tid())>=BOUNDED_CHUNK_SIZE);    
-    //first things first (Imma realist)...make sure the clock is running
-    if ( __tick_counter_is_running(group_info) &&
-         remaining_ticks>0){
-
-        //nmi will have to do this later using bounded_memory_fence_turn_on_tf, since they use a different stack.
-        if (!in_nmi()){
-            task_pt_regs(current)->flags |= X86_EFLAGS_TF;
+    remaining_ticks=(__get_chunk_ticks(group_info, __current_tid()) > BOUNDED_CHUNK_SIZE) ?
+        0 : BOUNDED_CHUNK_SIZE - __get_chunk_ticks(group_info, __current_tid());
+    //first things first (imma realist), make sure the tick counter is running (paranoia?)
+    if ( __tick_counter_is_running(group_info)){
+        //if we hit the chunk length on the nose, we have to terminate the chunk now and avoid single stepping
+        if (remaining_ticks==0){
+            __tick_counter_turn_off(group_info);
+            __hit_bounded_fence_enable();
+            //send a signal to the process
+            force_sig(SIGUSR1, current);
         }
-        //we're single stepping baby!!!
-        __single_stepping_enable(group_info, __current_tid(), remaining_ticks);
+        else if (remaining_ticks>0){
+            //nmi will have to do this later using bounded_memory_fence_turn_on_tf, since they use a different stack.
+            if (!in_nmi()){
+                task_pt_regs(current)->flags |= X86_EFLAGS_TF;
+            }
+            //we're single stepping baby!!!
+            __single_stepping_enable(group_info, __current_tid(), remaining_ticks);
+        }
     }
 }
 
 //For nmi context we need to pass the registers in
 void bounded_memory_fence_turn_on_tf(struct task_clock_group_info * group_info, struct pt_regs * regs){
     regs->flags |= X86_EFLAGS_TF;
+}
+
+//this function gets called when the userspace program is butting up against the chunk boundary, we've
+//turned on the single stepping...but then they finish the chunk. Now we need to turn off the trap
+//flag and clean up the rest of our mess.
+void end_bounded_memory_fence_early(struct task_clock_group_info * group_info){
+    //because we're in process context, we can do this safely.
+    task_pt_regs(current)->flags &= ~X86_EFLAGS_TF;
+    //just in case the trap flag doesn't remove cleanly...I've seen extra calls into on_single_step
+    __hit_bounded_fence_enable();
+    //turn off single stepping
+    __single_stepping_reset(group_info, __current_tid());
 }
 
 int on_single_step(struct task_clock_group_info * group_info, struct pt_regs *regs){
@@ -56,8 +75,8 @@ int on_single_step(struct task_clock_group_info * group_info, struct pt_regs *re
             __hit_bounded_fence_enable();
             //send a signal to the process
             force_sig(SIGUSR1, current);
+            //paranoia
             regs->flags &= ~X86_EFLAGS_TF;
-            
         }
         result=1;
     }
@@ -70,7 +89,5 @@ int on_single_step(struct task_clock_group_info * group_info, struct pt_regs *re
         regs->flags &= ~X86_EFLAGS_TF;
         result=1;
     }
-
     return result;
-
 }

@@ -18,6 +18,7 @@
 static inline void logical_clock_update_clock_ticks(struct task_clock_group_info * group_info, int tid){
     unsigned long rawcount = local64_read(&group_info->clocks[tid].event->count); 
     group_info->clocks[tid].debug_last_overflow_ticks=rawcount;
+    group_info->clocks[tid].debug_last_enable_ticks=__get_chunk_ticks(group_info, tid);
     __inc_clock_ticks(group_info, tid, rawcount);
     local64_set(&group_info->clocks[tid].event->count, 0);
 }
@@ -70,14 +71,10 @@ static inline void logical_clock_read_clock_and_update(struct task_clock_group_i
     //now add the event count in...why you may ask...Because the event's count field may have ticks we missed...I believe this is primarily
     //due to context switches.
     delta+=local64_read(&group_info->clocks[id].event->count);
-    /*int cpu=smp_processor_id();
-    u64 total=arch_irq_stat_cpu(cpu);
-    if (id==1){
-        printk(KERN_EMERG "update 2...delta: %lld id: %d current clock: %llu irqs: %d count: %llu cpu %d \n", 
-               delta, id , __get_clock_ticks(group_info, id), total, local64_read(&group_info->clocks[id].event->count), cpu);
-               }*/
     local64_set(&group_info->clocks[id].event->count, 0);
     if (counter_was_on){
+        group_info->clocks[__current_tid()].debug_last_overflow_ticks=delta;
+        group_info->clocks[id].debug_last_enable_ticks=__get_chunk_ticks(group_info, id);
         //add it to our current clock
         __inc_clock_ticks(group_info, id, delta);
         //let userspace see it
@@ -127,18 +124,28 @@ static inline void logical_clock_update_overflow_period(struct task_clock_group_
     uint64_t lowest_waiting_tid_clock, myclock, new_sample_period;
     int32_t lowest_waiting_tid=0;    
 
-    new_sample_period=group_info->clocks[id].event->hw.sample_period+10000;
-    lowest_waiting_tid = __search_for_lowest_waiting_exclude_current(group_info, id);
-    if (lowest_waiting_tid>=0){
-        lowest_waiting_tid_clock = __get_clock_ticks(group_info,lowest_waiting_tid);
-        myclock = __get_clock_ticks(group_info,id);
-        //if there is a waiting thread, and its clock is larger than ours, stop when we get there
-        if (lowest_waiting_tid_clock > myclock){
-            new_sample_period=__max(lowest_waiting_tid_clock - myclock + 1000, MIN_CLOCK_SAMPLE_PERIOD);
+    if (__single_stepping_on(group_info, id) || __hit_bounded_fence()){
+        //this shouldn't matter...as we're single stepping now or about to end a bounded chunk. Just set it to something that won't overflow
+        //during the single step
+        group_info->clocks[id].event->hw.sample_period = IMPRECISE_BOUNDED_CHUNK_SIZE;
+    }
+    else{
+        new_sample_period=group_info->clocks[id].event->hw.sample_period+10000;
+        lowest_waiting_tid = __search_for_lowest_waiting_exclude_current(group_info, id);
+        if (lowest_waiting_tid>=0){
+            lowest_waiting_tid_clock = __get_clock_ticks(group_info,lowest_waiting_tid);
+            myclock = __get_clock_ticks(group_info,id);
+            //if there is a waiting thread, and its clock is larger than ours, stop when we get there
+            if (lowest_waiting_tid_clock > myclock){
+                new_sample_period=__max(lowest_waiting_tid_clock - myclock + 1000, MIN_CLOCK_SAMPLE_PERIOD);
+            }
+        }
+        group_info->clocks[id].event->hw.sample_period =  __min(__bound_overflow_period(group_info, id, new_sample_period), MAX_CLOCK_SAMPLE_PERIOD);
+        if (!__single_stepping_on(group_info, id) &&
+            group_info->clocks[id].event->hw.sample_period + __get_chunk_ticks(group_info, id) > IMPRECISE_BOUNDED_CHUNK_SIZE){
         }
     }
-    group_info->clocks[id].debug_last_sample_period = group_info->clocks[id].event->hw.sample_period;
-    group_info->clocks[id].event->hw.sample_period =  __min(__bound_overflow_period(group_info, id, new_sample_period), MAX_CLOCK_SAMPLE_PERIOD);
+
 #endif
 }
 
