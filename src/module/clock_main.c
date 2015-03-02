@@ -765,7 +765,9 @@ int task_clock_entry_is_singlestep(struct task_clock_group_info * group_info, st
 
 int init_module(void)
 {
+#ifdef USE_BOUNDED_FENCE
     BUG_ON(BOUNDED_CHUNK_SIZE<MAX_CLOCK_SAMPLE_PERIOD);
+#endif
     
     task_clock_func.task_clock_overflow_handler=task_clock_overflow_handler;
     task_clock_func.task_clock_group_init=task_clock_group_init;
