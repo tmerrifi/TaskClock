@@ -26,7 +26,7 @@ static inline void tx_estimate_init(struct tx_estimator * txe){
     memset(txe,0,sizeof(struct tx_estimator));
 }
 
-static inline struct tx_estimate * __tx_get_entry(struct tx_estimator * txe, uint32_t identifier){
+static inline struct tx_estimate * __tx_get_entry(struct tx_estimator * txe, size_t identifier){
     int id = 0; 
     if (identifier){
         id = ((((identifier & 0xFF00)>>8)  & ((identifier & 0xFF0000)>>16)) % (TX_ESTIMATE_TOTAL_ENTRIES-1)) + 1;
@@ -34,13 +34,13 @@ static inline struct tx_estimate * __tx_get_entry(struct tx_estimator * txe, uin
     return &txe->entries[id];
 }
 
-static inline void tx_estimate_add_observation(struct tx_estimator * txe, uint32_t identifier, uint64_t ticks){
+static inline void tx_estimate_add_observation(struct tx_estimator * txe, size_t identifier, uint64_t ticks){
     struct tx_estimate * tx = __tx_get_entry(txe, identifier);
     tx->ewma=(uint64_t)(ticks*TX_ESTIMATE_EWMA_WEIGHT + (1.0F-TX_ESTIMATE_EWMA_WEIGHT)*tx->ewma);
     tx->observations[tx->counter++ % TX_ESTIMATE_TOTAL_OBSERVVATIONS]=ticks;
 }
 
-static inline int64_t tx_estimate_next_observation_guess(struct tx_estimator * txe, uint32_t identifier){
+static inline int64_t tx_estimate_next_observation_guess(struct tx_estimator * txe, size_t identifier){
     uint64_t total, result;
     int i=0;
     struct tx_estimate * tx = __tx_get_entry(txe, identifier);

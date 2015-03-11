@@ -136,9 +136,6 @@ void determ_task_clock_init_with_id(u_int32_t id){
     __make_clock_sys_call(task_clock_info.user_status, task_clock_info.tid, 0);
     //set up the performance counter
     perf_counter_init(DETERM_CLOCK_SAMPLE_PERIOD, (task_clock_info.tid==0) ? -1 : task_clock_info.perf_counter.fd, &task_clock_info.perf_counter);
-#if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
-    debug_clock_cache_init(task_clock_info.tid, &task_clock_info.debug_clock_cache);
-#endif
     //set the scaling factor
     determ_task_set_scaling_factor(1,0);
 }
@@ -316,11 +313,6 @@ uint64_t __rdpmc(uint32_t reg)
 
 void __determ_task_clock_start(int start_type){
     uint64_t diff=0;
-#ifdef DEBUG_CLOCK_CACHE_PROFILE
-    debug_clock_cache_insert(&task_clock_info.debug_clock_cache, determ_task_clock_read(), &diff);
-#elif DEBUG_CLOCK_CACHE_ON
-    debug_clock_cache_get(&task_clock_info.debug_clock_cache, determ_task_clock_read(), &diff);
-#endif
     task_clock_info.disabled=0;
     task_clock_info.user_status->lowest_clock=0;
     task_clock_info.last_clock_value=determ_task_clock_read();
@@ -402,7 +394,7 @@ u_int64_t determ_task_clock_get_last_tx_size(){
     return determ_task_clock_read() - task_clock_info.last_clock_value;
 }
 
-void __determ_task_clock_stop_with_id(uint32_t id, int stop_type){
+void __determ_task_clock_stop_with_id(size_t id, int stop_type){
     //read the clock
     /*if ( ioctl(task_clock_info.perf_counter.fd, stop_type) != 0){
         printf("\nClock read failed\n");
@@ -429,17 +421,6 @@ void __determ_task_clock_stop_with_id(uint32_t id, int stop_type){
     }
 
     tx_estimate_add_observation(&task_clock_info.estimator, id, tx_size);
-#if defined(DEBUG_CLOCK_CACHE_PROFILE) || defined(DEBUG_CLOCK_CACHE_ON)
-    uint64_t diff=0;
-#ifdef DEBUG_CLOCK_CACHE_PROFILE
-    debug_clock_cache_insert(&task_clock_info.debug_clock_cache, determ_task_clock_read(), &diff);
-#elif DEBUG_CLOCK_CACHE_ON
-    debug_clock_cache_get(&task_clock_info.debug_clock_cache, determ_task_clock_read(), &diff);
-#endif
-    if (diff>0){
-        determ_task_clock_add_ticks(diff);
-    }
-#endif
 }
 
 void determ_task_clock_stop(){
@@ -450,17 +431,17 @@ void determ_task_clock_stop_no_notify(){
     determ_task_clock_stop_with_id_no_notify(0);
 }
 
-void determ_task_clock_stop_with_id(uint32_t id){
+void determ_task_clock_stop_with_id(size_t id){
     __determ_task_clock_stop_with_id(id, TASK_CLOCK_NOT_COARSENED);
 }
 
 //Stop and read the clock...but don't do extra work in the kernel to wake someone up. Minor optimization
 //to speed up coarsened transactions
-void determ_task_clock_stop_with_id_no_notify(uint32_t id){
+void determ_task_clock_stop_with_id_no_notify(size_t id){
     __determ_task_clock_stop_with_id(id, TASK_CLOCK_COARSENED);
 }
 
-int64_t determ_task_clock_estimate_next_tx(uint32_t id){
+int64_t determ_task_clock_estimate_next_tx(size_t id){
     return tx_estimate_next_observation_guess(&task_clock_info.estimator, id);
 }
 

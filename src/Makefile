@@ -1,10 +1,15 @@
 
-.PHONY : module
+ifeq ($(TASKCLOCK_ARCH),32)
+	LIB_ARCH = -m32
+endif
+
 SHELL = /bin/bash
-CFLAGS = -g -std=gnu99 -fPIC -L/usr/lib -m32 -DDEBUG_CLOCK_CACHE_OFF -DDETERM_CLOCK_SAMPLE_PERIOD=5000 #-DNO_INSTRUCTION_COUNTING
-SOURCES = ./lib/perf_counter.o ./lib/determ_clock.o ./lib/debug_clock_cache.o
+CFLAGS = -g -std=gnu99 -fPIC -L/usr/lib $(LIB_ARCH) -DDEBUG_CLOCK_CACHE_OFF -DDETERM_CLOCK_SAMPLE_PERIOD=5000 #-DNO_INSTRUCTION_COUNTING
+SOURCES = ./lib/perf_counter.o ./lib/determ_clock.o
 TESTS = clock_tests
 LIBS = -lrt -lksnap
+
+.PHONY : module
 
 all : dynlib module
 
